@@ -1,0 +1,15 @@
+version: "3.8"
+services:
+  node:
+    image: "arm64v8/node:19-alpine"
+    container_name: "portal-bot"
+    user: node:1002
+    working_dir: /home/node/app
+    environment:
+      - NODE_ENV=production
+    volumes:
+      - ./:/home/node/app
+    security_opt:
+      - seccomp:unconfined
+    command: npm run setup
+    restart: unless-stopped
