@@ -1,9 +1,10 @@
 {
   "scripts": {
     "start": "node app.js",
-    "build": "tsc",
+    "build": "npx tsc",
     "dev": "tsc -w",
-    "run": "npx nodemon app.js"
+    "run": "npx nodemon app.js",
+    "setup": "npm install && npm run build && npm run start"
   },
   "dependencies": {
     "discord.js": "^14.7.1",
