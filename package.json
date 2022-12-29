@@ -1,4 +1,7 @@
 {
+  "name": "discord-portal",
+  "version": "0.1.0",
+  "main": "app.js",
   "scripts": {
     "start": "node app.js",
     "build": "npx tsc",
@@ -6,6 +9,8 @@
     "run": "npx nodemon app.js",
     "setup": "npm install && npm run build && npm run start"
   },
+  "author": "Colorman",
+  "license": "GPLv3",
   "dependencies": {
     "discord.js": "^14.7.1",
     "dotenv": "^16.0.3",
