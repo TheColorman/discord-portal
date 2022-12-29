@@ -201,8 +201,8 @@ client.once(Events.ClientReady, c => {
 });
 
 client.on(Events.MessageCreate, async message => {
-    // Ignore if webhook or self
-    if (message.webhookId || message.author.equals(message.client.user)) return;
+    // Ignore if webhook
+    if (message.webhookId) return;
     // Ignore if DM
     if (!message.guildId) return;
 
