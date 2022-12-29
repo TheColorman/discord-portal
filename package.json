@@ -1,0 +1,16 @@
+{
+  "scripts": {
+    "start": "node app.js",
+    "build": "tsc",
+    "dev": "tsc -w",
+    "run": "npx nodemon app.js"
+  },
+  "dependencies": {
+    "discord.js": "^14.7.1",
+    "dotenv": "^16.0.3",
+    "sqlite3": "^5.1.4"
+  },
+  "devDependencies": {
+    "typescript": "^4.9.4"
+  }
+}
