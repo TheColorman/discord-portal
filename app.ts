@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, ComponentType, ChannelType, ButtonStyle, Interaction, TextInputStyle, MessageReaction, User, TextChannel, WebhookClient, Webhook, Embed } from 'discord.js';
+import { Client, Events, GatewayIntentBits, ComponentType, ChannelType, ButtonStyle, Interaction, TextInputStyle, MessageReaction, User, TextChannel, WebhookClient, Webhook, Embed, MessageReference } from 'discord.js';
 import sqlite3 from 'sqlite3';
 import dotenv from 'dotenv';
 import { prefix } from './config.json';
