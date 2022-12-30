@@ -439,6 +439,45 @@ client.on(Events.MessageCreate, async message => {
     // Save webhook messages to database
     const portalMessages = await Promise.all(webhookMessages.map(async linkedMessage => await createPortalMessage({ portalId: portalConnection.portalId, messageId: message.id, linkedChannelId: linkedMessage.channelId, linkedMessageId: linkedMessage.id })));
 });
+
+// Delete messages
+client.on(Events.MessageDelete, async message => {
+    // Ignore webhook deletions
+    if (message.webhookId) return;
+    console.log(message)
+
+    // Check if message is a portal message
+    const portalMessage = await getPortalMessages(message.id);
+    if (!portalMessage) return;
+    // Delete linked messages
+    for (const linkedMessage of portalMessage) {
+        // Find channel and message objects
+        const channel = await client.channels.fetch(linkedMessage.linkedChannelId) as TextChannel | null;
+        if (!channel) continue;
+        const message = await channel.messages.fetch(linkedMessage.linkedMessageId);
+        if (!message) continue;
+
+        // Attempt to delete message
+        try { // Webhook deletion (cleanest)
+            const portalConnection = await getPortalConnection(channel.id);
+            if (!portalConnection) throw 'No portal connection found.'
+
+            const webhook = await getWebhook({ channel, webhookId: portalConnection.webhookId });
+            await webhook.deleteMessage(linkedMessage.linkedMessageId);
+        } catch (webhookError) { // Webhook failed, try to delete with bot
+            console.log(webhookError)
+            try {
+                message.delete();
+            } catch (deleteError) { // Bot failed, send note
+                console.log(deleteError)
+                channel.send('Note: I need the `Manage Messages` permission to function properly.');
+            }
+        }
+    }
+    // Delete portal message
+    await deletePortalMessages(message.id);
+});
+
     }
 });
 
