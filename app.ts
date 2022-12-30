@@ -411,7 +411,24 @@ client.on(Events.MessageCreate, async message => {
         return null;
     }).filter(e => e !== null) as Embed[];    
     
+    // Convert unknown emojis
+    const emojis = message.content.match(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g);
+    const replacement = emojis?.map(e => {
+        const id = e.match(/[0-9]+/g)?.[0];
+        if (!id) return e;
+        const emoji = client.emojis.cache.get(id);
+        if (emoji) return emoji.toString();
+        return `https://cdn.discordapp.com/emojis/${id}.webp?size=64&quality=lossless`;
+    });
+    if (emojis && replacement) {
+        // Replace message content matches
+        for (let i = 0; i < emojis.length; i++) {
+            message.content = message.content.replace(emojis[i], replacement[i]);
+        }
+    }
+
     for (const connection of otherConnections) {
+        // Get channel
         const channel = await client.channels.fetch(connection.channelId) as TextChannel | null;
         if (!channel) { // Remove connection if channel is not found
             await deletePortalConnection(connection.channelId);
