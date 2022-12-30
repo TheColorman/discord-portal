@@ -143,7 +143,7 @@ const getPortals = async () => {
 }
 const createPortalConnection = async (portalId: string, channelId: string) => {
     const channel = await client.channels.fetch(channelId) as TextChannel;
-    const webhook = await createWebhook(channel);
+    const webhook = await getWebhook({ channel });
     return new Promise<PortalConnection>((resolve, reject) => {
         db.serialize(async () => {
             db.run('INSERT INTO portalConnections (portalId, guildId, guildName, channelId, channelName, webhookId, webhookToken) VALUES (?, ?, ?, ?, ?, ?, ?)', [portalId, channel.guildId, channel.guild.name, channelId, channel.name, webhook.id, webhook.token]);
@@ -162,7 +162,7 @@ const deletePortalConnection = async (channelId: string) => {
                     if (row) {
                         const portalConnection = { portalId: row.portalId, guildId: row.guildId, guildName: row.guildName, channelId: row.channelId, channelName: row.channelName, webhookId: row.webhookId, webhookToken: row.webhookToken };
                         const channel = await client.channels.fetch(channelId) as TextChannel;
-                        const webhook = (await channel.fetchWebhooks()).find(webhook => webhook.id === row.webhookId);
+                        const webhook = await getWebhook({ channel, webhookId: portalConnection.webhookId });
                         if (webhook) await webhook.delete();
                         db.run('DELETE FROM portalConnections WHERE channelId = ?', [channelId]);
                         resolve(portalConnection);
