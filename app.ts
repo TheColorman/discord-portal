@@ -468,6 +468,43 @@ client.on(Events.MessageDelete, async message => {
     await deletePortalMessages(message.id);
 });
 
+// Edit messages
+client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
+    // Ignore webhook edits
+    if (newMessage.webhookId) return;
+
+    // Check if message is a portal message
+    const portalMessage = await getPortalMessages(newMessage.id);
+    if (!portalMessage) return;
+
+    // Edit linked messages
+    for (const linkedMessage of portalMessage) {
+        // Find channel and message objects
+        const channel = await client.channels.fetch(linkedMessage.linkedChannelId) as TextChannel | null;
+        if (!channel) continue;
+        const message = await channel.messages.fetch(linkedMessage.linkedMessageId);
+        if (!message) continue;
+
+        // Attempt to edit message
+        try { // Webhook edit (cleanest)
+            const portalConnection = await getPortalConnection(channel.id);
+            if (!portalConnection) throw 'No portal connection found.'
+
+            const webhook = await getWebhook({ channel, webhookId: portalConnection.webhookId });
+            await webhook.editMessage(linkedMessage.linkedMessageId, {
+                content: newMessage.content,
+                files: newMessage.attachments.map(a => ({
+                    attachment: a.url,
+                    name: a.name || undefined
+                })),
+                embeds: newMessage.embeds,
+                allowedMentions: {
+                    parse: [ 'users' ]
+                }
+            });
+        } catch (webhookError) { // Webhook failed
+            console.error(webhookError)
+        }
     }
 });
 
