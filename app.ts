@@ -232,114 +232,124 @@ client.on(Events.MessageCreate, async message => {
         const args = message.content.slice(prefix.length).trim().split(/ +/g);
         const command = args.shift()?.toLowerCase();
 
-        if (command === 'setup' || command === 'join') {
-            const portalGuildConnections = await getGuildPortalConnections(message.guildId);
-            if (portalGuildConnections.length > 0) {
-                message.reply('A server can currently only have one Portal connection. Please remove the current connection before setting up a new one.');
-                return;
-            }
-            // Create new connectionSetup
-            if (connectionSetups.has(message.author.id)) connectionSetups.delete(message.author.id);
-            connectionSetups.set(message.author.id, {
-                channelId: message.channel.id,
-                portalId: '',
-                expires: Date.now() + 60000
-            });
-            setTimeout(() => {
-                // Remove setup if not completed
+        switch (command) {
+            case 'setup':
+            case 'join': {
+                const portalGuildConnections = await getGuildPortalConnections(message.guildId);
+                if (portalGuildConnections.length > 0) {
+                    message.reply('A server can currently only have one Portal connection. Please remove the current connection before setting up a new one.');
+                    break;
+                }
+                // Create new connectionSetup
                 if (connectionSetups.has(message.author.id)) connectionSetups.delete(message.author.id);
-            }, 60000);
-            
-            // Send message
-            const portals = await getPortals();
-            message.reply({
-                content: `__Selected channel:__ <#${message.channel.id}>.\n${portalIntro.portal}.`,
-                components: [
-                    {
-                        type: ComponentType.ActionRow,
-                        components: [
-                            {
-                                type: ComponentType.StringSelect,
-                                customId: 'portalSelect',
-                                maxValues: 1,
-                                minValues: 1,
-                                options: Array.from(portals.values()).map(p => ({
-                                    label: `${p.customEmoji ? '' : p.emoji}${p.name}`,
-                                    value: p.id
-                                })),
-                                placeholder: 'Select a Portal'
-                            }
-                        ]
-                    }, {
-                        type: ComponentType.ActionRow,
-                        components: [
-                            {
-                                type: ComponentType.Button,
-                                customId: 'portalCreate',
-                                label: 'Create new Portal',
-                                style: ButtonStyle.Primary
-                            }, {
-                                type: ComponentType.Button,
-                                customId: 'portalSelectCancel',
-                                label: 'Cancel',
-                                style: ButtonStyle.Danger
-                            }
-                        ]
-                    }
-                ]
-            });    
-        }
-        if (command === 'portal' || command === 'portals') {
-            const portalConnection = await getChannelPortalConnection(message.channel.id);
-            if (portalConnection) {
-                const portal = await getPortal(portalConnection.portalId);
-                const portalConnections = await getPortalConnections(portalConnection.portalId);
-                message.reply({
-                    content: `Connected to Portal \`#${portal?.id}\` - ${portal?.emoji}${portal!.name}.\nConnection shared with\n${portalConnections.map(c => `• **${c.guildName}** - ${c.channelName}`).join('\n')}`,
+                connectionSetups.set(message.author.id, {
+                    channelId: message.channel.id,
+                    portalId: '',
+                    expires: Date.now() + 60000
                 });
-            } else {
-                message.reply({
-                    content: 'This channel is not connected to any Portals.',
-                });
-            }
-        }
-        if (command === 'leave') {
-            const portalConnection = await deletePortalConnection(message.channel.id);
-            if (portalConnection) {
-                const portal = await getPortal(portalConnection.portalId);
-                message.reply({
-                    content: `Left Portal \`#${portalConnection.portalId}\` - ${portal?.emoji}${portal?.name}.`,
-                });
-            } else {
-                message.reply({
-                    content: 'This channel is not connected to any Portals.',
-                });
-            }
-        }
-        if (command === 'delete') {
-            const portalConnection = await getChannelPortalConnection(message.channel.id);
-            if (portalConnection) {
+                setTimeout(() => {
+                    // Remove setup if not completed
+                    if (connectionSetups.has(message.author.id)) connectionSetups.delete(message.author.id);
+                }, 60000);
+                
+                // Send message
                 const portals = await getPortals();
-                const portalConnections = await getPortalConnections(portalConnection.portalId);
-                if (portalConnections.length > 1) {
-                    message.reply('Cannot delete Portal with multiple connections.');
-                    return;
-                }
-                if (portals.size <= 1) {
-                    message.reply('Cannot delete last Portal.');
-                    return;
-                }
-                const portal = await deletePortal(portalConnection.portalId);
-                message.reply(`Deleted Portal \`#${portalConnection.portalId}\` - ${portal?.emoji}${portal?.name}.`);
-            } else {
                 message.reply({
-                    content: 'This channel is not connected to any Portals.',
+                    content: `__Selected channel:__ <#${message.channel.id}>.\n${portalIntro.portal}.`,
+                    components: [
+                        {
+                            type: ComponentType.ActionRow,
+                            components: [
+                                {
+                                    type: ComponentType.StringSelect,
+                                    customId: 'portalSelect',
+                                    maxValues: 1,
+                                    minValues: 1,
+                                    options: Array.from(portals.values()).map(p => ({
+                                        label: `${p.customEmoji ? '' : p.emoji}${p.name}`,
+                                        value: p.id
+                                    })),
+                                    placeholder: 'Select a Portal'
+                                }
+                            ]
+                        }, {
+                            type: ComponentType.ActionRow,
+                            components: [
+                                {
+                                    type: ComponentType.Button,
+                                    customId: 'portalCreate',
+                                    label: 'Create new Portal',
+                                    style: ButtonStyle.Primary
+                                }, {
+                                    type: ComponentType.Button,
+                                    customId: 'portalSelectCancel',
+                                    label: 'Cancel',
+                                    style: ButtonStyle.Danger
+                                }
+                            ]
+                        }
+                    ]
                 });
-                return;
             }
-        }
-        if (command === 'invite' || command === 'link') {
-            message.reply('Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=537263168&scope=bot')
+            case 'portal':
+            case 'portals': {
+
+                const portalConnection = await getChannelPortalConnection(message.channel.id);
+                if (portalConnection) {
+                    const portal = await getPortal(portalConnection.portalId);
+                    const portalConnections = await getPortalConnections(portalConnection.portalId);
+                    message.reply({
+                        content: `Connected to Portal \`#${portal?.id}\` - ${portal?.emoji}${portal!.name}.\nConnection shared with\n${portalConnections.map(c => `• **${c.guildName}** - ${c.channelName}`).join('\n')}`,
+                    });
+                } else {
+                    message.reply({
+                        content: 'This channel is not connected to any Portals.',
+                    });
+                }
+                break;
+            }
+            case 'leave': {
+                const portalConnection = await deletePortalConnection(message.channel.id);
+                if (portalConnection) {
+                    const portal = await getPortal(portalConnection.portalId);
+                    message.reply({
+                        content: `Left Portal \`#${portalConnection.portalId}\` - ${portal?.emoji}${portal?.name}.`,
+                    });
+                } else {
+                    message.reply({
+                        content: 'This channel is not connected to any Portals.',
+                    });
+                }
+                break;
+            }
+            case 'delete': {
+                const portalConnection = await getChannelPortalConnection(message.channel.id);
+                if (portalConnection) {
+                    const portals = await getPortals();
+                    const portalConnections = await getPortalConnections(portalConnection.portalId);
+                    if (portalConnections.length > 1) {
+                        message.reply('Cannot delete Portal with multiple connections.');
+                        break;
+                    }
+                    if (portals.size <= 1) {
+                        message.reply('Cannot delete last Portal.');
+                        break;
+                    }
+                    const portal = await deletePortal(portalConnection.portalId);
+                    message.reply(`Deleted Portal \`#${portalConnection.portalId}\` - ${portal?.emoji}${portal?.name}.`);
+                } else {
+                    message.reply({
+                        content: 'This channel is not connected to any Portals.',
+                    });
+                    break;
+                }
+                break;
+            }
+            case 'invite':
+            case 'link': {
+                message.reply('Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=537263168&scope=bot')
+                break;
+            }
         }
     }
 
