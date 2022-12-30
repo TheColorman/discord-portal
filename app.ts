@@ -61,6 +61,7 @@ process.on('exit', () => {
 db.serialize(() => { 
     db.run('CREATE TABLE IF NOT EXISTS portals (id TEXT PRIMARY KEY, name TEXT, emoji TEXT, customEmoji INTEGER DEFAULT 0)');
     db.run('CREATE TABLE IF NOT EXISTS portalConnections (portalId TEXT, guildId TEXT, guildName TEXT, channelId TEXT, channelName TEXT, webhookId TEXT, webhookToken TEXT, FOREIGN KEY(portalId) REFERENCES portals(id))');
+    db.run('CREATE TABLE IF NOT EXISTS portalMessages (portalId TEXT, messageId TEXT, linkedChannelId TEXT, linkedMessageId TEXT, FOREIGN KEY(portalId) REFERENCES portals(id))')
 });
 // Create default portal if none exists
 db.get('SELECT * FROM portals', (err, row) => {
