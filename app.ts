@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, ComponentType, ChannelType, ButtonStyle, Interaction, TextInputStyle, MessageReaction, User, TextChannel, WebhookClient, Webhook, Embed, MessageReference } from 'discord.js';
+import { Client, Events, GatewayIntentBits, ComponentType, ChannelType, ButtonStyle, Interaction, TextInputStyle, MessageReaction, User, TextChannel, Embed, MessageReference, PermissionFlagsBits, Message } from 'discord.js';
 import sqlite3 from 'sqlite3';
 import dotenv from 'dotenv';
 import { prefix } from './config.json';
@@ -103,6 +103,13 @@ const getWebhook = async ({ channel, webhookId }: { channel: string | TextChanne
         return webhook;
     }
     else return webhook;
+}
+const checkPermissions = async (message: Message) => {
+    if (!message.member?.permissions.has(PermissionFlagsBits.ManageChannels)) {
+        message.reply('You need the `Manage Channels` permission to use this command.');
+        return false;
+    }
+    return true;
 }
 // Database helpers
 const createPortal = async ({ name, emoji, customEmoji }: { name: string, emoji: string, customEmoji: boolean }): Promise<Portal> => {
@@ -283,8 +290,33 @@ client.on(Events.MessageCreate, async message => {
         const command = args.shift()?.toLowerCase();
 
         switch (command) {
+            case 'portal':
+            case 'portals': {
+
+                const portalConnection = await getPortalConnection(message.channel.id);
+                if (portalConnection) {
+                    const portal = await getPortal(portalConnection.portalId);
+                    const portalConnections = await getPortalConnections(portalConnection.portalId);
+                    message.reply({
+                        content: `Connected to Portal \`#${portal?.id}\` - ${portal?.emoji}${portal!.name}.\nConnection shared with\n${portalConnections.map(c => `• **${c.guildName}** - ${c.channelName}`).join('\n')}`,
+                    });
+                } else {
+                    message.reply({
+                        content: 'This channel is not connected to any Portals.',
+                    });
+                }
+                break;
+            }
+            case 'invite':
+            case 'link': {
+                message.reply('Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=537263168&scope=bot')
+                break;
+            }    
             case 'setup':
             case 'join': {
+                // Check permissions
+                if (!checkPermissions(message)) break;
+
                 const portalGuildConnections = await getGuildPortalConnections(message.guildId);
                 if (portalGuildConnections.length > 0) {
                     message.reply('A server can currently only have one Portal connection. Please remove the current connection before setting up a new one.');
@@ -342,24 +374,10 @@ client.on(Events.MessageCreate, async message => {
                 });
                 break;
             }
-            case 'portal':
-            case 'portals': {
-
-                const portalConnection = await getPortalConnection(message.channel.id);
-                if (portalConnection) {
-                    const portal = await getPortal(portalConnection.portalId);
-                    const portalConnections = await getPortalConnections(portalConnection.portalId);
-                    message.reply({
-                        content: `Connected to Portal \`#${portal?.id}\` - ${portal?.emoji}${portal!.name}.\nConnection shared with\n${portalConnections.map(c => `• **${c.guildName}** - ${c.channelName}`).join('\n')}`,
-                    });
-                } else {
-                    message.reply({
-                        content: 'This channel is not connected to any Portals.',
-                    });
-                }
-                break;
-            }
             case 'leave': {
+                // Check permissions
+                if (!checkPermissions(message)) break;
+
                 const portalConnection = await deletePortalConnection(message.channel.id);
                 if (portalConnection) {
                     const portal = await getPortal(portalConnection.portalId);
@@ -374,6 +392,9 @@ client.on(Events.MessageCreate, async message => {
                 break;
             }
             case 'delete': {
+                // Check permissions
+                if (!checkPermissions(message)) break;
+
                 const portalConnection = await getPortalConnection(message.channel.id);
                 if (portalConnection) {
                     const portals = await getPortals();
@@ -394,11 +415,6 @@ client.on(Events.MessageCreate, async message => {
                     });
                     break;
                 }
-                break;
-            }
-            case 'invite':
-            case 'link': {
-                message.reply('Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=537263168&scope=bot')
                 break;
             }
         }
