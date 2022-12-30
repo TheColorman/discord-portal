@@ -411,12 +411,8 @@ client.on(Events.MessageCreate, async message => {
             await deletePortalConnection(connection.channelId);
             continue;
         }
-        let webhook = new WebhookClient({ id: connection.webhookId, token: connection.webhookToken }) as WebhookClient | Webhook | null;
-        if (!webhook) {
-            webhook = await createWebhook(channel);
-        }
-        if (!webhook) continue;
-        await webhook.send({
+        const webhook = await getWebhook({ channel });
+        const webhookMessage = await webhook.send({
             content: message.content,
             username: `${message.author.username}#${message.author.discriminator} @ ${portalConnection.guildName}`,
             avatarURL: message.author.avatarURL() || undefined,
