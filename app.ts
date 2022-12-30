@@ -35,6 +35,8 @@ type PortalConnection = {
 type PortalConnectionOptions = {
     guildName?: string,
     channelName?: string,
+    webhookId?: string,
+    webhookToken?: string
 }
 type PortalMessage = {
     portalId: string,
@@ -95,7 +97,11 @@ const getWebhook = async ({ channel, webhookId }: { channel: string | TextChanne
     if (!webhookId) return createWebhook(channel);
     const webhooks = await channel.fetchWebhooks();
     const webhook = webhooks.get(webhookId);
-    if (!webhook) return createWebhook(channel);
+    if (!webhook) {
+        const webhook = await createWebhook(channel);
+        await updatePortalConnection(channel.id, { webhookId: webhook.id, webhookToken: webhook.token! });
+        return webhook;
+    }
     else return webhook;
 }
 // Database helpers
@@ -216,17 +222,16 @@ const updatePortalConnection = async (channelId: string, portalConnectionOptions
         db.serialize(async () => {
             const portalConnection = await getChannelPortalConnection(channelId);
             if (portalConnection) {
-                const channel = await client.channels.fetch(channelId) as TextChannel;
                 // Update only the options in portalConnectionOptions that are not null
-                const { guildName, channelName } = portalConnectionOptions;
-                db.run('UPDATE portalConnections SET guildName = ?, channelName = ? WHERE channelId = ?', [guildName ?? portalConnection.guildName, channelName ?? portalConnection.channelName, channelId]);
-                resolve({ portalId: portalConnection.portalId, guildId: portalConnection.guildId, guildName: guildName ?? portalConnection.guildName, channelId: portalConnection.channelId, channelName: channelName ?? portalConnection.channelName, webhookId: portalConnection.webhookId, webhookToken: portalConnection.webhookToken as string });
+                const { guildName, channelName, webhookId, webhookToken } = portalConnectionOptions;
+                db.run('UPDATE portalConnections SET guildName = ?, channelName = ?, webhookId = ?, webhookToken = ? WHERE channelId = ?', [guildName ?? portalConnection.guildName, channelName ?? portalConnection.channelName, webhookId ?? portalConnection.webhookId, webhookToken ?? portalConnection.webhookToken, channelId]);
+                resolve({ portalId: portalConnection.portalId, guildId: portalConnection.guildId, guildName: guildName ?? portalConnection.guildName, channelId: portalConnection.channelId, channelName: channelName ?? portalConnection.channelName, webhookId: webhookId ?? portalConnection.webhookId, webhookToken: webhookToken ?? portalConnection.webhookToken });
             } else reject('Could not find connection in database.');
         });
     });
 }
 const createPortalMessage = async ({ portalId, messageId, linkedChannelId, linkedMessageId }: { portalId: string, messageId: string, linkedChannelId: string, linkedMessageId: string }): Promise<PortalMessage> => {
-    db.run('INSERT INTO portalMessages (portalId, messageId, linkedMessageId) VALUES (?, ?, ?)', [portalId, messageId, linkedMessageId]);
+    db.run('INSERT INTO portalMessages (portalId, messageId, linkedChannelId, linkedMessageId) VALUES (?, ?, ?, ?)', [portalId, messageId, linkedChannelId, linkedMessageId]);
     return { portalId, messageId, linkedChannelId, linkedMessageId };
 }
 const deletePortalMessages = async (messageId: string) => {
