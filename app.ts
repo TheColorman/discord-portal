@@ -74,6 +74,8 @@ db.get('SELECT * FROM portals', (err, row) => {
     }
 });
 
+const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions]})
+
 // Helpers
 const sendExpired = (interaction: Interaction) => { if (interaction.isRepliable()) interaction.reply({ content: 'Expired.', ephemeral: true }) };
 const generateName = () => `${nameSuggestions.beginning[Math.floor(Math.random() * nameSuggestions.beginning.length)]} ${nameSuggestions.middle[Math.floor(Math.random() * nameSuggestions.middle.length)]} ${nameSuggestions.end[Math.floor(Math.random() * nameSuggestions.end.length)]}`
