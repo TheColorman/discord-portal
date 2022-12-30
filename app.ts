@@ -90,6 +90,15 @@ const createWebhook = async (channel: TextChannel) => {
     const webhook = await channel.createWebhook({ name: 'Portal connection', reason: 'New Portal connection established' }); //TODO: Add avatar
     return webhook;
 }
+const getWebhook = async ({ channel, webhookId }: { channel: string | TextChannel, webhookId?: string }) => {
+    if (typeof channel === 'string') channel = await client.channels.fetch(channel) as TextChannel;
+    if (!webhookId) return createWebhook(channel);
+    const webhooks = await channel.fetchWebhooks();
+    const webhook = webhooks.get(webhookId);
+    if (!webhook) return createWebhook(channel);
+    else return webhook;
+}
+// Database helpers
 const createPortal = async (name: string, emoji: string, customEmoji: boolean): Promise<Portal> => {
     const portalId = await generatePortalId();
     db.run('INSERT INTO portals (id, name, emoji, customEmoji) VALUES (?, ?, ?, ?)', [portalId, name, emoji, customEmoji]);
