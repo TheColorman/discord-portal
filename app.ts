@@ -410,13 +410,14 @@ client.on(Events.MessageCreate, async message => {
     // Get other connections
     const otherConnections = portalConnections.filter(c => c.channelId !== message.channel.id);
     // Send message to other channels
+    let webhookMessages = [];
     for (const connection of otherConnections) {
         const channel = await client.channels.fetch(connection.channelId) as TextChannel | null;
         if (!channel) { // Remove connection if channel is not found
             await deletePortalConnection(connection.channelId);
             continue;
         }
-        const webhook = await getWebhook({ channel });
+        const webhook = await getWebhook({ channel, webhookId: connection.webhookId });
         const webhookMessage = await webhook.send({
             content: message.content,
             username: `${message.author.username}#${message.author.discriminator} @ ${portalConnection.guildName}`,
@@ -431,6 +432,13 @@ client.on(Events.MessageCreate, async message => {
                 parse: [ 'users' ]
             }
         });
+        if (webhookMessage) {
+            webhookMessages.push({ id: webhookMessage.id, channelId: channel.id});
+        }
+    }
+    // Save webhook messages to database
+    const portalMessages = await Promise.all(webhookMessages.map(async linkedMessage => await createPortalMessage({ portalId: portalConnection.portalId, messageId: message.id, linkedChannelId: linkedMessage.channelId, linkedMessageId: linkedMessage.id })));
+});
     }
 });
 
