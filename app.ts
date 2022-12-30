@@ -235,17 +235,7 @@ const createPortalMessage = async ({ portalId, messageId, linkedChannelId, linke
     return { portalId, messageId, linkedChannelId, linkedMessageId };
 }
 const deletePortalMessages = async (messageId: string) => {
-    const portalMessages = await getPortalMessages(messageId);
-    if (!portalMessages) throw 'Could not find portal message in database.';
-    // Remove from database
     db.run('DELETE FROM portalMessages WHERE messageId = ?', [messageId]);
-    // Delete using webhooks
-    for (const portalMessage of portalMessages) {
-        const portalConnection = await getChannelPortalConnection(portalMessage.linkedChannelId);
-        if (!portalConnection) throw 'Could not find portal connection in database.';
-        const webhook = await getWebhook({ channel: portalMessage.linkedChannelId, webhookId: portalConnection.webhookId})
-        await webhook.deleteMessage(portalMessage.linkedMessageId);
-    }
 }
 const getPortalMessages = async (messageId: string): Promise<PortalMessage[] | null> => {
     return new Promise<PortalMessage[] | null>((resolve, reject) => {
