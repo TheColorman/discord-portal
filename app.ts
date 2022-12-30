@@ -32,6 +32,16 @@ type PortalConnection = {
     webhookId: string,
     webhookToken: string
 }
+type PortalConnectionOptions = {
+    guildName?: string,
+    channelName?: string,
+}
+type PortalMessage = {
+    portalId: string,
+    messageId: string,
+    linkedChannelId: string,
+    linkedMessageId: string
+}
 
 // Config
 const portalIntro = {
