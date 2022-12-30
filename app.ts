@@ -399,15 +399,29 @@ client.on(Events.MessageCreate, async message => {
     const portalConnections = await getPortalConnections(portalConnection.portalId);
     // Get other connections
     const otherConnections = portalConnections.filter(c => c.channelId !== message.channel.id);
+
     // Send message to other channels
     let webhookMessages = [];
+
+    // -- Preprocess message --
+    // Replace image embeds with links
+    const embeds = message.embeds.map(e => {
+        if (!e.data.url) return e;
+        if (!message.content.includes(e.data.url)) message.content += `\n${e.data.url}`;
+        return null;
+    }).filter(e => e !== null) as Embed[];    
+    
     for (const connection of otherConnections) {
         const channel = await client.channels.fetch(connection.channelId) as TextChannel | null;
         if (!channel) { // Remove connection if channel is not found
             await deletePortalConnection(connection.channelId);
             continue;
         }
+        // Get webhook
         const webhook = await getWebhook({ channel, webhookId: connection.webhookId });
+        
+
+        // Send webhook message
         const webhookMessage = await webhook.send({
             content: message.content,
             username: `${message.author.username}#${message.author.discriminator} @ ${portalConnection.guildName}`,
@@ -416,7 +430,7 @@ client.on(Events.MessageCreate, async message => {
                 attachment: a.url,
                 name: a.name || undefined
             })),
-            embeds: message.embeds,
+            embeds: embeds,
             tts: message.tts,
             allowedMentions: {
                 parse: [ 'users' ]
@@ -427,14 +441,13 @@ client.on(Events.MessageCreate, async message => {
         }
     }
     // Save webhook messages to database
-    const portalMessages = await Promise.all(webhookMessages.map(async linkedMessage => await createPortalMessage({ portalId: portalConnection.portalId, messageId: message.id, linkedChannelId: linkedMessage.channelId, linkedMessageId: linkedMessage.id })));
+    await Promise.all(webhookMessages.map(async linkedMessage => await createPortalMessage({ portalId: portalConnection.portalId, messageId: message.id, linkedChannelId: linkedMessage.channelId, linkedMessageId: linkedMessage.id })));
 });
 
 // Delete messages
 client.on(Events.MessageDelete, async message => {
     // Ignore webhook deletions
     if (message.webhookId) return;
-    console.log(message)
 
     // Check if message is a portal message
     const portalMessage = await getPortalMessages(message.id);
