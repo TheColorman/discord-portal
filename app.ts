@@ -437,6 +437,8 @@ client.on(Events.MessageCreate, async message => {
             message.content = message.content.replace(emojis[i], replacement[i]);
         }
     }
+    // Replies
+    const portalMessages = message.reference?.messageId ? await getPortalMessages(message.reference.messageId) : [];
 
     for (const connection of otherConnections) {
         // Get channel
@@ -445,13 +447,38 @@ client.on(Events.MessageCreate, async message => {
             await deletePortalConnection(connection.channelId);
             continue;
         }
+
+        // Add replies
+        let content = message.content;
+        const createReply = async (messageReference: MessageReference) => {
+            const failMsg = `\`[Reply failed]\``
+            if (!messageReference.messageId) return `${failMsg}\n`;
+            // Find reference in Portal
+            let portalMessage = portalMessages?.find(m => m.linkedChannelId === channel.id) as PortalMessage | undefined | null;
+            const link = `https://discord.com/channels/${channel.guildId}/${channel.id}/`;
+            let linkedMessageId = portalMessage?.linkedMessageId;
+            if (!linkedMessageId) {
+                // If reference wasn't found it's because the message is probably a webhook message
+                // In this case, we need to fetch the PortalMessage by the linked message id
+                portalMessage = await getPortalMessageByLinkedMessage({ linkedChannelId: messageReference.channelId, linkedMessageId: messageReference.messageId });
+                linkedMessageId = portalMessage?.messageId;
+            }
+            if (!linkedMessageId) return `${failMsg}\n`;
+
+            const reference = await channel.messages.fetch(linkedMessageId);
+            // Remove first line if it's a reply
+            const msgContent = reference.content.startsWith('[[Reply: ') ? reference.content.split('\n').slice(1).join('\n') : reference.content;
+            const preview = msgContent.length + reference.author.tag.length > 50 ? msgContent.substring(0, 50 - reference.author.tag.length) + '...' : msgContent;
+                
+            return `[[Reply to \`${reference.author.tag}\` - \`${preview}\`]](<${link}${linkedMessageId}>)\n`;
+        }
+        if (message.reference) content = await createReply(message.reference) + content || content;
+
         // Get webhook
         const webhook = await getWebhook({ channel, webhookId: connection.webhookId });
-        
-
         // Send webhook message
         const webhookMessage = await webhook.send({
-            content: message.content,
+            content: content,
             username: `${message.author.username}#${message.author.discriminator} @ ${portalConnection.guildName}`,
             avatarURL: message.author.avatarURL() || undefined,
             files: message.attachments.map(a => ({
