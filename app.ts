@@ -290,6 +290,7 @@ client.on(Events.MessageCreate, async message => {
                         }
                     ]
                 });
+                break;
             }
             case 'portal':
             case 'portals': {
