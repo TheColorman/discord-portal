@@ -237,6 +237,17 @@ const createPortalMessage = async ({ portalId, messageId, linkedChannelId, linke
 const deletePortalMessages = async (messageId: string) => {
     db.run('DELETE FROM portalMessages WHERE messageId = ?', [messageId]);
 }
+const getPortalMessageByLinkedMessage = async ({ linkedChannelId, linkedMessageId }: { linkedChannelId: string, linkedMessageId: string }): Promise<PortalMessage | null> => {
+    return new Promise<PortalMessage | null>((resolve, reject) => {
+        db.get('SELECT * FROM portalMessages WHERE linkedChannelId = ? AND linkedMessageId = ?', [linkedChannelId, linkedMessageId], (err, row) => {
+            if (err) reject(err);
+            else {
+                if (row) resolve({ portalId: row.portalId, messageId: row.messageId, linkedChannelId: row.linkedChannelId, linkedMessageId: row.linkedMessageId });
+                else resolve(null);
+            }
+        });
+    });
+}
 const getPortalMessages = async (messageId: string): Promise<PortalMessage[] | null> => {
     return new Promise<PortalMessage[] | null>((resolve, reject) => {
         db.all('SELECT * FROM portalMessages WHERE messageId = ?', [messageId], (err, rows) => {
