@@ -211,8 +211,38 @@ const getPortalConnections = async (portalId: string): Promise<Array<PortalConne
         });
     });
 }
-
-const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions]})
+const createPortalMessage = async (portalId: string, messageId: string, linkedChannelId: string, linkedMessageId: string): Promise<PortalMessage> => {
+    db.run('INSERT INTO portalMessages (portalId, messageId, linkedMessageId) VALUES (?, ?, ?)', [portalId, messageId, linkedMessageId]);
+    return { portalId, messageId, linkedChannelId, linkedMessageId };
+}
+const deletePortalMessages = async (messageId: string) => {
+    const portalMessages = await getPortalMessages(messageId);
+    if (!portalMessages) throw 'Could not find portal message in database.';
+    // Remove from database
+    db.run('DELETE FROM portalMessages WHERE messageId = ?', [messageId]);
+    // Delete using webhooks
+    for (const portalMessage of portalMessages) {
+        const portalConnection = await getChannelPortalConnection(portalMessage.linkedChannelId);
+        if (!portalConnection) throw 'Could not find portal connection in database.';
+        const webhook = await getWebhook({ channel: portalMessage.linkedChannelId, webhookId: portalConnection.webhookId})
+        await webhook.deleteMessage(portalMessage.linkedMessageId);
+    }
+}
+const getPortalMessages = async (messageId: string): Promise<PortalMessage[] | null> => {
+    return new Promise<PortalMessage[] | null>((resolve, reject) => {
+        db.all('SELECT * FROM portalMessages WHERE messageId = ?', [messageId], (err, rows) => {
+            if (err) reject(err);
+            else {
+                if (rows.length > 0) {
+                    const portalMessages = rows.map(row => {
+                        return { portalId: row.portalId, messageId: row.messageId, linkedChannelId: row.linkedChannelId, linkedMessageId: row.linkedMessageId };
+                    });
+                    resolve(portalMessages);
+                } else resolve(null);
+            }
+        });
+    });
+}
 
 // Keep track of setups
 const connectionSetups = new Map<string, { channelId: string, portalId: string, expires: number }>();
