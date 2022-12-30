@@ -470,9 +470,10 @@ client.on(Events.MessageCreate, async message => {
             const reference = await channel.messages.fetch(linkedMessageId);
             // Remove first line if it's a reply
             const msgContent = reference.content.startsWith('[[Reply: ') ? reference.content.split('\n').slice(1).join('\n') : reference.content;
-            const preview = msgContent.length + reference.author.tag.length > 50 ? msgContent.substring(0, 50 - reference.author.tag.length) + '...' : msgContent;
+            const authorTag = reference.author.tag.split('@')[0];
+            const preview = msgContent.length + authorTag.length > 50 ? msgContent.substring(0, 50 - authorTag.length) + '...' : msgContent;
                 
-            return `[[Reply to \`${reference.author.tag}\` - \`${preview}\`]](<${link}${linkedMessageId}>)\n`;
+            return `[[Reply to \`${authorTag}\` - \`${preview}\`]](<${link}${linkedMessageId}>)\n`;
         }
         if (message.reference) content = await createReply(message.reference) + content || content;
 
