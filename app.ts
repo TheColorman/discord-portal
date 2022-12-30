@@ -153,7 +153,7 @@ const createPortalConnection = async ({ portalId, channelId }: { portalId: strin
     return new Promise<PortalConnection>((resolve, reject) => {
         db.serialize(async () => {
             db.run('INSERT INTO portalConnections (portalId, guildId, guildName, channelId, channelName, webhookId, webhookToken) VALUES (?, ?, ?, ?, ?, ?, ?)', [portalId, channel.guildId, channel.guild.name, channelId, channel.name, webhook.id, webhook.token]);
-            const portalConnection = await getChannelPortalConnection(channelId);
+            const portalConnection = await getPortalConnection(channelId);
             if (portalConnection) resolve(portalConnection);
             else reject('Could not find connection in database.');
         });
@@ -192,7 +192,7 @@ const getGuildPortalConnections = async (guildId: string): Promise<Array<PortalC
         });
     });
 }
-const getChannelPortalConnection = async (channelId: string): Promise<PortalConnection | null> => {
+const getPortalConnection = async (channelId: string): Promise<PortalConnection | null> => {
     return new Promise<{ portalId: string, guildId: string, guildName: string, channelId: string, channelName: string, webhookId: string, webhookToken: string } | null>((resolve, reject) => {
         db.get('SELECT * FROM portalConnections WHERE channelId = ?', [channelId], (err, row) => {
             if (err) reject(err);
@@ -220,7 +220,7 @@ const getPortalConnections = async (portalId: string): Promise<Array<PortalConne
 const updatePortalConnection = async (channelId: string, portalConnectionOptions: PortalConnectionOptions) => {
     return new Promise<PortalConnection | null>((resolve, reject) => {
         db.serialize(async () => {
-            const portalConnection = await getChannelPortalConnection(channelId);
+            const portalConnection = await getPortalConnection(channelId);
             if (portalConnection) {
                 // Update only the options in portalConnectionOptions that are not null
                 const { guildName, channelName, webhookId, webhookToken } = portalConnectionOptions;
@@ -344,7 +344,7 @@ client.on(Events.MessageCreate, async message => {
             case 'portal':
             case 'portals': {
 
-                const portalConnection = await getChannelPortalConnection(message.channel.id);
+                const portalConnection = await getPortalConnection(message.channel.id);
                 if (portalConnection) {
                     const portal = await getPortal(portalConnection.portalId);
                     const portalConnections = await getPortalConnections(portalConnection.portalId);
@@ -373,7 +373,7 @@ client.on(Events.MessageCreate, async message => {
                 break;
             }
             case 'delete': {
-                const portalConnection = await getChannelPortalConnection(message.channel.id);
+                const portalConnection = await getPortalConnection(message.channel.id);
                 if (portalConnection) {
                     const portals = await getPortals();
                     const portalConnections = await getPortalConnections(portalConnection.portalId);
@@ -404,7 +404,7 @@ client.on(Events.MessageCreate, async message => {
     }
 
     // Portal functionality
-    const portalConnection = await getChannelPortalConnection(message.channel.id);
+    const portalConnection = await getPortalConnection(message.channel.id);
     if (!portalConnection) return;
     const portalConnections = await getPortalConnections(portalConnection.portalId);
     // Get other connections
