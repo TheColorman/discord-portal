@@ -99,7 +99,7 @@ const getWebhook = async ({ channel, webhookId }: { channel: string | TextChanne
     else return webhook;
 }
 // Database helpers
-const createPortal = async (name: string, emoji: string, customEmoji: boolean): Promise<Portal> => {
+const createPortal = async ({ name, emoji, customEmoji }: { name: string, emoji: string, customEmoji: boolean }): Promise<Portal> => {
     const portalId = await generatePortalId();
     db.run('INSERT INTO portals (id, name, emoji, customEmoji) VALUES (?, ?, ?, ?)', [portalId, name, emoji, customEmoji]);
     return { id: portalId, name, emoji, customEmoji };
@@ -141,7 +141,7 @@ const getPortals = async () => {
         });
     });
 }
-const createPortalConnection = async (portalId: string, channelId: string) => {
+const createPortalConnection = async ({ portalId, channelId }: { portalId: string, channelId: string }) => {
     const channel = await client.channels.fetch(channelId) as TextChannel;
     const webhook = await getWebhook({ channel });
     return new Promise<PortalConnection>((resolve, reject) => {
@@ -225,7 +225,7 @@ const updatePortalConnection = async (channelId: string, portalConnectionOptions
         });
     });
 }
-const createPortalMessage = async (portalId: string, messageId: string, linkedChannelId: string, linkedMessageId: string): Promise<PortalMessage> => {
+const createPortalMessage = async ({ portalId, messageId, linkedChannelId, linkedMessageId }: { portalId: string, messageId: string, linkedChannelId: string, linkedMessageId: string }): Promise<PortalMessage> => {
     db.run('INSERT INTO portalMessages (portalId, messageId, linkedMessageId) VALUES (?, ?, ?)', [portalId, messageId, linkedMessageId]);
     return { portalId, messageId, linkedChannelId, linkedMessageId };
 }
@@ -475,7 +475,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     if (!setup) return sendExpired(interaction);
                     
                     // Join portal
-                    const portalConnection = await createPortalConnection(setup.portalId, setup.channelId);
+                    const portalConnection = await createPortalConnection({ portalId: setup.portalId, channelId: setup.channelId });
                     const portal = await getPortal(portalConnection.portalId);
                     interaction.update({
                         content: `Joined \`$${portal?.id}\` - ${portal?.emoji}${portal?.name}!`,
@@ -509,9 +509,9 @@ client.on(Events.InteractionCreate, async interaction => {
                 case 'portalCreateConfirm': { // Confirm creation of new portal
                     const portalSetup = portalSetups.get(interaction.user.id);
                     if (!portalSetup) return sendExpired(interaction);
-                    const portal = await createPortal(portalSetup.name, portalSetup.emoji, portalSetup.customEmoji);
+                    const portal = await createPortal({ name: portalSetup.name, emoji: portalSetup.emoji, customEmoji: portalSetup.customEmoji });
                     portalSetups.delete(interaction.user.id);
-                    const portalConnection = await createPortalConnection(portal.id, portalSetup.channelId);
+                    const portalConnection = await createPortalConnection({ portalId: portal.id, channelId: portalSetup.channelId });
                     interaction.update({
                         content: `Created and joined Portal \`#${portalConnection.portalId}\` - ${portal.emoji}${portal.name}.`,
                         components: []
