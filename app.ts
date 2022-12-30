@@ -421,7 +421,7 @@ client.on(Events.MessageCreate, async message => {
         if (!message.content.includes(e.data.url)) message.content += `\n${e.data.url}`;
         return null;
     }).filter(e => e !== null) as Embed[];    
-    
+
     // Convert unknown emojis
     const emojis = message.content.match(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g);
     const replacement = emojis?.map(e => {
@@ -429,7 +429,7 @@ client.on(Events.MessageCreate, async message => {
         if (!id) return e;
         const emoji = client.emojis.cache.get(id);
         if (emoji) return emoji.toString();
-        return `https://cdn.discordapp.com/emojis/${id}.webp?size=64&quality=lossless`;
+        return `https://cdn.discordapp.com/emojis/${id}.webp?size=48&quality=lossless`;
     });
     if (emojis && replacement) {
         // Replace message content matches
