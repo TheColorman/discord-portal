@@ -439,6 +439,8 @@ client.on(Events.MessageCreate, async message => {
     }
     // Replies
     const portalMessages = message.reference?.messageId ? await getPortalMessages(message.reference.messageId) : [];
+    // Stickers
+    message.content += '\n' + message.stickers.map(s => s.url).join('\n');
 
     for (const connection of otherConnections) {
         // Get channel
