@@ -489,6 +489,7 @@ client.on(Events.MessageCreate, async message => {
 
             try {
                 const reference = await channel.messages.fetch(linkedMessageId);
+                console.log('crash test')
                 // Remove first line if it's a reply
                 const msgContent = reference.content.startsWith('[[Reply to ') || reference.content.startsWith('\`[Reply failed\`]') ? reference.content.split('\n').slice(1).join('\n') : reference.content;
                 const authorTag = reference.author.tag.split('@')[0];
