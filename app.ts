@@ -578,16 +578,24 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     if (newMessage.webhookId) return;
 
     // Check if message is a portal message
-    const portalMessage = await getPortalMessages(newMessage.id);
-    if (!portalMessage) return;
+    const portalMessages = await getPortalMessages(newMessage.id);
+    if (!portalMessages) return;
 
     // Edit linked messages
-    for (const linkedMessage of portalMessage) {
+    for (const linkedMessage of portalMessages) {
         // Find channel and message objects
-        const channel = await client.channels.fetch(linkedMessage.linkedChannelId) as TextChannel | null;
-        if (!channel) continue;
-        const message = await channel.messages.fetch(linkedMessage.linkedMessageId);
-        if (!message) continue;
+        let channel;
+        let message;
+        try {
+            channel = await client.channels.fetch(linkedMessage.linkedChannelId) as TextChannel | null;
+            if (!channel) continue;
+            message = await channel.messages.fetch(linkedMessage.linkedMessageId);
+            if (!message) continue;
+        } catch (e) {
+            console.log('#2') // #2
+            console.log(e)
+            continue;
+        }
 
         // Attempt to edit message
         try { // Webhook edit (cleanest)
