@@ -449,7 +449,7 @@ client.on(Events.MessageCreate, async message => {
         if (!id) return e;
         const emoji = client.emojis.cache.get(id);
         if (emoji) return emoji.toString();
-        return `https://cdn.discordapp.com/emojis/${id}.webp?size=48&quality=lossless`;
+        return `https://cdn.discordapp.com/emojis/${id}.webp?size=48&quality=lossless\n`;
     });
     if (emojis && replacement) {
         // Replace message content matches
