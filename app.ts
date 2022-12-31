@@ -538,10 +538,18 @@ client.on(Events.MessageDelete, async message => {
     // Delete linked messages
     for (const linkedMessage of portalMessage) {
         // Find channel and message objects
-        const channel = await client.channels.fetch(linkedMessage.linkedChannelId) as TextChannel | null;
-        if (!channel) continue;
-        const message = await channel.messages.fetch(linkedMessage.linkedMessageId);
-        if (!message) continue;
+        let channel;
+        let message;
+        try {
+            channel = await client.channels.fetch(linkedMessage.linkedChannelId) as TextChannel | null;
+            if (!channel) continue;
+            message = await channel.messages.fetch(linkedMessage.linkedMessageId);
+            if (!message) continue;
+        } catch (e) {
+            console.log('#1') // #1
+            console.log(e)
+            continue;
+        }
 
         // Attempt to delete message
         try { // Webhook deletion (cleanest)
