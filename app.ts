@@ -315,7 +315,12 @@ client.on(Events.MessageCreate, async message => {
             case 'link': {
                 message.reply('Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=537263168&scope=bot')
                 break;
-            }    
+            }
+            case 'help':
+            case 'commands': {
+                message.reply('`?portal` - Get information about the Portal connection of the current channel.\n`?join` - Join a Portal.\n`?leave` - Leave a Portal.\n`?delete` - Delete a Portal.\n`?invite` - Get an invite link for the bot.\n`?help` - Get a list of commands.');
+                break;
+            }
             case 'setup':
             case 'join': {
                 // Check permissions
