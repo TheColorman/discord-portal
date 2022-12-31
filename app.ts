@@ -58,6 +58,7 @@ const db = new sqlite3.Database('./db.sqlite', err => {
 });
 process.on('exit', () => {
     db.close();
+});
 // Prevent crashes
 process.on('uncaughtException', (err) => {
     console.error(err);
