@@ -2,7 +2,6 @@ import { Client, Events, GatewayIntentBits, ComponentType, ButtonStyle, Interact
 import sqlite3 from 'better-sqlite3';
 import dotenv from 'dotenv';
 import { prefix } from './config.json';
-sqlite3.verbose();
 dotenv.config();
 
 const token = process.env.TOKEN;
