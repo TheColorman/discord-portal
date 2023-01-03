@@ -77,7 +77,7 @@ db.transaction(() => {
         db.prepare('INSERT INTO portals (id, name, emoji, customEmoji) VALUES (?, ?, ?, ?)')
             .run(['123456', 'Genesis', '🎆', false]);
     }
-});
+})
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions] })
 
@@ -637,7 +637,7 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     if (!portalMessages.size) return;
 
     // Edit linked messages
-    for (const linkedMessage of portalMessages) {
+    for (const [messageId, portalMessage] of portalMessages) {
         // Find channel and message objects
         const channel = await client.channels.fetch(portalMessage.linkedChannelId) as TextChannel | null;
         if (!channel) continue;
