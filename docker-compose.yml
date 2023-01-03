@@ -2,6 +2,7 @@ version: "3.8"
 services:
   node:
     image: "arm64v8/node:19-alpine"
+    build: .
     container_name: "portal-bot"
     user: node:1002
     working_dir: /home/node/app
