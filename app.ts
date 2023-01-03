@@ -535,10 +535,10 @@ client.on(Events.MessageCreate, async message => {
 
     for (const [channelId, portalConnection] of portalConnections) {
         // Don't send to same channel
-        if (channelId === message.channel.id) continue;
+        if (portalConnection.channelId === message.channel.id) continue;
 
         // Get channel
-        const channel = await client.channels.fetch(channelId) as TextChannel | null;
+        const channel = await client.channels.fetch(portalConnection.channelId) as TextChannel | null;
         if (!channel) { // Remove connection if channel is not found
             deletePortalConnection(portalConnection.channelId);
             continue;
