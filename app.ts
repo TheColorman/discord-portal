@@ -582,7 +582,7 @@ client.on(Events.MessageCreate, async message => {
         // Send webhook message
         const webhookMessage = await webhook.send({
             content: content,
-            username: `${message.author.username}#${message.author.discriminator} @ ${portalConnection.guildName}`,
+            username: `${message.author.tag} @ ${portalConnection.guildName}`,
             avatarURL: message.author.avatarURL() || undefined,
             files: message.attachments.map(a => ({
                 attachment: a.url,
