@@ -534,6 +534,31 @@ client.on(Events.MessageCreate, async message => {
     // Replies
     const originalReference = message.reference?.messageId ? await safeFetchMessage(message.channel, message.reference.messageId) : null;
     let content = message.content;
+    const getLinked = () => {
+        const failed = '`[Reply failed]`\n';
+        
+        if (!originalReference) return failed;
+
+        const refContent = originalReference.content.replace(/<@!?([0-9]+)>/g, (_, id) => { // Replace <@id> with @username
+            const user = client.users.cache.get(id);
+            if (!user) return `@Unknown`;
+            return `@${user.username}`;
+        }).replace(/\n/g, ' ') // Remove newlines
+        const refAuthorTag = originalReference.author.tag.split("@")[0].trim();
+        const refPreview = refContent.length + refAuthorTag.length > 50 ? refContent.substring(0, 50 - refAuthorTag.length) + '...' : refContent;
+        
+        const referencePortalMessageId = originalReference.webhookId ?
+            getPortalMessageId(originalReference.id, true) : 
+            getPortalMessageId(originalReference.id);
+
+        if (!referencePortalMessageId) return failed;
+        const linkedPortalMessages = getPortalMessages(referencePortalMessageId);
+
+        return { refAuthorTag, refPreview, linkedPortalMessages }
+    }
+    const reply = getLinked();
+
+
 
     const portalMessageId = generatePortalMessageId();
 
@@ -550,33 +575,19 @@ client.on(Events.MessageCreate, async message => {
 
         // Add replies
         if (originalReference) {
-            const createReply = () => {
-                const failed = '`[Reply failed]`\n';
-                
-                const refContent = originalReference.content.replace(/<@!?([0-9]+)>/g, (_, id) => { // Replace <@id> with @username
-                    const user = client.users.cache.get(id);
-                    if (!user) return `@Unknown`;
-                    return `@${user.username}`;
-                }).replace(/\n/g, ' ') // Remove newlines
-                const refAuthorTag = originalReference.author.tag.split("@")[0].trim();
-                const refPreview = refContent.length + refAuthorTag.length > 50 ? refContent.substring(0, 50 - refAuthorTag.length) + '...' : refContent;
-                
-                const referencePortalMessageId = originalReference.webhookId ?
-                    getPortalMessageId(originalReference.id, true) : 
-                    getPortalMessageId(originalReference.id);
-
-                if (!referencePortalMessageId) return failed;
-                const linkedPortalMessages = getPortalMessages(referencePortalMessageId);
+            const buildReply = () => {
+                if (typeof(reply) === 'string') return reply;
+                const { refAuthorTag, refPreview, linkedPortalMessages } = reply;
 
                 const localReferenceId = linkedPortalMessages.find(m => m.linkedChannelId === channel.id)?.linkedMessageId ?? // If we can find a message in this channel, use that
                     (originalReference.webhookId ? // Else, if the reply is to a webhook
-                            linkedPortalMessages.first()?.messageId : // Use the messageId, since it means the source is in this channel (we are the source)
-                            linkedPortalMessages.find(m => m.linkedChannelId === channel.id)?.linkedMessageId); // If it's not a webhook, it must be a linkedMessage from this channel
+                        linkedPortalMessages.first()?.messageId : // Use the messageId, since it means the source is in this channel (we are the source)
+                        linkedPortalMessages.find(m => m.linkedChannelId === channel.id)?.linkedMessageId); // If it's not a webhook, it must be a linkedMessage from this channel
 
-                if (!localReferenceId) return failed;
+                if (!localReferenceId) return '`[Reply failed]`\n';
                 return '[[Reply to `' + refAuthorTag + '` - `' + refPreview + '`]](https://discord.com/channels/' + channel.guildId + '/' + channel.id + '/' + localReferenceId + ')\n';
             }
-            content = createReply() + message.content;
+            content = buildReply() + message.content;
         }
 
         // Get webhook
