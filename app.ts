@@ -540,11 +540,17 @@ client.on(Events.MessageCreate, async message => {
         
         if (!originalReference) return failed;
 
-        const refContent = originalReference.content.replace(/<@!?([0-9]+)>/g, (_, id) => { // Replace <@id> with @username
-            const user = client.users.cache.get(id);
-            if (!user) return `@Unknown`;
-            return `@${user.username}`;
-        }).replace(/\n/g, ' ') // Remove newlines
+        // Remove first line if it starts with "`[Reply failed]`" or "[[Reply to `"
+        const refContent = (originalReference.content.startsWith("`[Reply failed]`") || originalReference.content.startsWith("[[Reply to `") ?
+            originalReference.content.split('\n').slice(1).join('\n') :
+            originalReference.content)
+                .replace(/<@!?([0-9]+)>/g, (_, id) => { // Replace <@id> with @username
+                    const user = client.users.cache.get(id);
+                    if (!user) return `@Unknown`;
+                    return `@${user.username}`;
+                }).replace(/\n/g, ' ') // Remove newlines
+                .replace(/`/g, '\`') // Escape backticks
+        
         const refAuthorTag = originalReference.author.tag.split("@")[0].trim();
         const refPreview = refContent.length + refAuthorTag.length > 50 ? refContent.substring(0, 50 - refAuthorTag.length) + '...' : refContent;
         
