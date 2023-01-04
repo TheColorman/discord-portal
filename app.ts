@@ -38,6 +38,7 @@ type PortalConnectionOptions = {
     webhookToken?: string
 }
 type PortalMessage = {
+    id: string,
     portalId: string,
     messageId: string,
     linkedChannelId: string,
@@ -47,6 +48,7 @@ type PortalId = string;
 type ChannelId = string;
 type MessageId = string;
 type UserId = string;
+type PortalMessageId = string;
 
 // Config
 const portalIntro = {
