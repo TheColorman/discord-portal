@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, ComponentType, ButtonStyle, Interaction, TextInputStyle, MessageReaction, User, TextChannel, Embed, MessageReference, PermissionFlagsBits, Message, MessagePayload, WebhookEditMessageOptions, Webhook, Collection } from 'discord.js';
+import { Client, Events, GatewayIntentBits, ComponentType, ButtonStyle, Interaction, TextInputStyle, MessageReaction, User, TextChannel, Embed, MessageReference, PermissionFlagsBits, Message, MessagePayload, WebhookEditMessageOptions, Webhook, Collection, ChannelType } from 'discord.js';
 import sqlite3 from 'better-sqlite3';
 import dotenv from 'dotenv';
 import { prefix } from './config.json';
@@ -65,30 +65,33 @@ process.on('uncaughtException', (err) => {
 });
 
 // Create tables
-db.transaction(() => {
-    // db.run('DROP TABLE portalMessages')
-    db.prepare('CREATE TABLE IF NOT EXISTS portals (id TEXT PRIMARY KEY, name TEXT, emoji TEXT, customEmoji INTEGER DEFAULT 0)').run()
-    db.prepare('CREATE TABLE IF NOT EXISTS portalConnections (portalId TEXT, guildId TEXT, guildName TEXT, channelId TEXT, channelName TEXT, webhookId TEXT, webhookToken TEXT, FOREIGN KEY(portalId) REFERENCES portals(id))').run()
-    db.prepare('CREATE TABLE IF NOT EXISTS portalMessages (portalId TEXT, messageId TEXT, linkedChannelId TEXT, linkedMessageId TEXT, FOREIGN KEY(portalId) REFERENCES portals(id))').run()
-});
-db.transaction(() => {
-    // Create default portal if none exists
-    if (!db.prepare('SELECT COUNT(1) FROM portals').get()) {
-        db.prepare('INSERT INTO portals (id, name, emoji, customEmoji) VALUES (?, ?, ?, ?)')
-            .run(['123456', 'Genesis', '🎆', false]);
-    }
-})
+console.log('Creating tables...');
+// db.prepare('DROP TABLE portalMessages').run()
+db.prepare('CREATE TABLE IF NOT EXISTS portals (id TEXT PRIMARY KEY, name TEXT, emoji TEXT, customEmoji INTEGER DEFAULT 0)').run()
+db.prepare('CREATE TABLE IF NOT EXISTS portalConnections (portalId TEXT, guildId TEXT, guildName TEXT, channelId TEXT, channelName TEXT, webhookId TEXT, webhookToken TEXT, FOREIGN KEY(portalId) REFERENCES portals(id))').run()
+db.prepare('CREATE TABLE IF NOT EXISTS portalMessages (id TEXT, portalId TEXT, messageId TEXT, linkedChannelId TEXT, linkedMessageId TEXT, FOREIGN KEY(portalId) REFERENCES portals(id))').run()
+// Create default portal if none exists
+if (!db.prepare('SELECT COUNT(1) FROM portals').get()) {
+    db.prepare('INSERT INTO portals (id, name, emoji, customEmoji) VALUES (?, ?, ?, ?)')
+        .run(['123456', 'Genesis', '🎆', false]);
+}
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions] })
 
 // Helpers
 const sendExpired = (interaction: Interaction) => { if (interaction.isRepliable()) interaction.reply({ content: 'Expired.', ephemeral: true }) };
-const generateName = () => `${nameSuggestions.beginning[Math.floor(Math.random() * nameSuggestions.beginning.length)]} ${nameSuggestions.middle[Math.floor(Math.random() * nameSuggestions.middle.length)]} ${nameSuggestions.end[Math.floor(Math.random() * nameSuggestions.end.length)]}`
-const generateEmoji = () => emojiSuggestions[Math.floor(Math.random() * emojiSuggestions.length)]
-const generatePortalId = () => {
+const generateName = (): string => `${nameSuggestions.beginning[Math.floor(Math.random() * nameSuggestions.beginning.length)]} ${nameSuggestions.middle[Math.floor(Math.random() * nameSuggestions.middle.length)]} ${nameSuggestions.end[Math.floor(Math.random() * nameSuggestions.end.length)]}`
+const generateEmoji = (): string => emojiSuggestions[Math.floor(Math.random() * emojiSuggestions.length)]
+const generatePortalId = (): PortalId => {
     let id = Math.floor(Math.random() * 1000000).toString();
     const portals = getPortals()
     while (portals[id as keyof typeof portals]) id = Math.floor(Math.random() * 1000000).toString();
+    return id;
+}
+const generatePortalMessageId = (): PortalMessageId => {
+    const id = Math.floor(Math.random() * 1000000).toString();
+    const portalMessages = getPortalMessages(id);
+    if (portalMessages[id as keyof typeof portalMessages]) return generatePortalMessageId();
     return id;
 }
 async function safeFetchMessage(channel: TextChannel, messageId: string): Promise<Message<true> | null> {
@@ -272,62 +275,56 @@ function updatePortalConnection(channelId: string, portalConnectionOptions: Port
         webhookToken: webhookToken ?? portalConnection.webhookToken
     };
 }
-function createPortalMessage({ 
+function createPortalMessage({
+    id,
     portalId, 
     messageId, 
     linkedChannelId, 
     linkedMessageId 
-}: { 
-    portalId: string; 
-    messageId: string; 
-    linkedChannelId: string; 
-    linkedMessageId: string; 
+}: {
+    id: PortalMessageId;
+    portalId: PortalId;
+    messageId: MessageId;
+    linkedChannelId: ChannelId; 
+    linkedMessageId: MessageId;
 }): PortalMessage {
-    db.prepare('INSERT INTO portalMessages (portalId, messageId, linkedChannelId, linkedMessageId) VALUES (?, ?, ?, ?)')
-        .run([portalId, messageId, linkedChannelId, linkedMessageId]);
-    return { portalId, messageId, linkedChannelId, linkedMessageId };
-}
-function deletePortalMessages(messageId: string): PortalMessage | null {
-    const portalMessage = getPortalMessage(messageId);
-    if (!portalMessage)
-        return null;
-    db.prepare('DELETE FROM portalMessages WHERE messageId = ?')
-        .run(messageId);
-    return portalMessage;
-}
-function getPortalMessage(messageId: string): PortalMessage | null {
-    const portalMessage = db.prepare('SELECT * FROM portalMessages WHERE messageId = ?')
-        .get(messageId);
-    if (!portalMessage)
-        return null;
+    // Note: Make sure id is the same for all linked messages
+    db.prepare('INSERT INTO portalMessages (id, portalId, messageId, linkedChannelId, linkedMessageId) VALUES (?, ?, ?, ?, ?)')
+        .run([id, portalId, messageId, linkedChannelId, linkedMessageId]);
     return {
-        portalId: portalMessage.portalId,
-        messageId: portalMessage.messageId,
-        linkedChannelId: portalMessage.linkedChannelId,
-        linkedMessageId: portalMessage.linkedMessageId
+        id,
+        portalId: portalId,
+        messageId: messageId,
+        linkedChannelId: linkedChannelId,
+        linkedMessageId: linkedMessageId
     };
 }
-function getPortalMessages(messageId: string): Collection<MessageId, PortalMessage> {
-    const portalMessages = db.prepare('SELECT * FROM portalMessages WHERE messageId = ?')
-        .all(messageId);
-    return new Collection<MessageId, PortalMessage>(portalMessages.map(portalMessage => ([portalMessage.messageId, {
+function deletePortalMessages(id: PortalMessageId): Map<MessageId, PortalMessage> | null {
+    const portalMessages = getPortalMessages(id);
+    if (!portalMessages.size)
+        return null;
+    db.prepare('DELETE FROM portalMessages WHERE id = ?')
+        .run(id);
+    return portalMessages;
+}
+function getPortalMessages(id: PortalMessageId): Collection<MessageId, PortalMessage> {
+    const portalMessages = db.prepare('SELECT * FROM portalMessages WHERE id = ?')
+        .all(id);
+    return new Collection<MessageId, PortalMessage>(portalMessages.map(portalMessage => ([portalMessage.linkedMessageId, {
+        id: portalMessage.id,
         portalId: portalMessage.portalId,
         messageId: portalMessage.messageId,
         linkedChannelId: portalMessage.linkedChannelId,
         linkedMessageId: portalMessage.linkedMessageId
     }])));
 }
-function getPortalMessageByLinkedMessage({ linkedChannelId, linkedMessageId }: { linkedChannelId: string; linkedMessageId: string; }): PortalMessage | null {
-    const portalMessage = db.prepare('SELECT * FROM portalMessages WHERE linkedChannelId = ? AND linkedMessageId = ?')
-        .get([linkedChannelId, linkedMessageId]);
-    if (!portalMessage)
+function getPortalMessageId(messageId: MessageId, linkedMessage?: boolean): PortalMessageId | null {
+    const idType = linkedMessage ? 'linkedMessageId' : 'messageId';
+    const portalMessageId = db.prepare('SELECT id FROM portalMessages WHERE ' + idType + ' = ?')
+        .get(messageId)?.id;
+    if (!portalMessageId)
         return null;
-    return {
-        portalId: portalMessage.portalId,
-        messageId: portalMessage.messageId,
-        linkedChannelId: portalMessage.linkedChannelId,
-        linkedMessageId: portalMessage.linkedMessageId
-    };
+    return portalMessageId;
 }
 
 // Keep track of setups
@@ -343,6 +340,8 @@ client.on(Events.MessageCreate, async message => {
     if (message.webhookId) return;
     // Ignore if DM
     if (!message.guildId) return;
+    // Ignore if not TextChannel
+    if (message.channel.type !== ChannelType.GuildText) return;
 
     if (message.content.startsWith(prefix)) {
         const args = message.content.slice(prefix.length).trim().split(/ +/g);
@@ -528,10 +527,13 @@ client.on(Events.MessageCreate, async message => {
             message.content = message.content.replace(emojis[i], replacement[i]);
         }
     }
-    // Replies
-    const portalMessages = message.reference?.messageId ? getPortalMessages(message.reference.messageId) : new Collection<PortalId, PortalMessage>();
     // Stickers
     message.content += '\n' + message.stickers.map(s => s.url).join('\n');
+    // Replies
+    const originalReference = message.reference?.messageId ? await safeFetchMessage(message.channel, message.reference.messageId) : null;
+    let content = message.content;
+
+    const portalMessageId = generatePortalMessageId();
 
     for (const [channelId, portalConnection] of portalConnections) {
         // Don't send to same channel
@@ -545,44 +547,42 @@ client.on(Events.MessageCreate, async message => {
         }
 
         // Add replies
-        let content = message.content;
-        const createReply = async (messageReference: MessageReference) => {
-            const failMsg = `\`[Reply failed]\``
-            if (!messageReference.messageId)
-                return `${failMsg}\n`;
+        if (originalReference) {
+            const createReply = () => {
+                const failed = '`[Reply failed]`\n';
+                
+                const refContent = originalReference.content.replace(/<@!?([0-9]+)>/g, (_, id) => { // Replace <@id> with @username
+                    const user = client.users.cache.get(id);
+                    if (!user) return `@Unknown`;
+                    return `@${user.username}`;
+                }).replace(/\n/g, ' ') // Remove newlines
+                const refAuthorTag = originalReference.author.tag.split("@")[0].trim();
+                const refPreview = refContent.length + refAuthorTag.length > 50 ? refContent.substring(0, 50 - refAuthorTag.length) + '...' : refContent;
+                
+                const referencePortalMessageId = originalReference.webhookId ?
+                    getPortalMessageId(originalReference.id, true) : 
+                    getPortalMessageId(originalReference.id);
 
-            // Find reference in Portal
-            let portalMessage = getPortalMessage(messageReference.messageId);
-            const link = `https://discord.com/channels/${channel.guildId}/${channel.id}/`;
-            let linkedMessageId = portalMessage?.linkedMessageId;
-            if (!linkedMessageId) {
-                // If reference wasn't found it's because the message is probably a webhook message
-                // In this case, we need to fetch the PortalMessage by the linked message id
-                portalMessage = getPortalMessageByLinkedMessage({ linkedChannelId: messageReference.channelId, linkedMessageId: messageReference.messageId });
-                linkedMessageId = portalMessage?.messageId;
+                if (!referencePortalMessageId) return failed;
+                const linkedPortalMessages = getPortalMessages(referencePortalMessageId);
+
+                const localReferenceId = linkedPortalMessages.find(m => m.linkedChannelId === channel.id)?.linkedMessageId ?? // If we can find a message in this channel, use that
+                    (originalReference.webhookId ? // Else, if the reply is to a webhook
+                            linkedPortalMessages.first()?.messageId : // Use the messageId, since it means the source is in this channel (we are the source)
+                            linkedPortalMessages.find(m => m.linkedChannelId === channel.id)?.linkedMessageId); // If it's not a webhook, it must be a linkedMessage from this channel
+
+                if (!localReferenceId) return failed;
+                return '[[Reply to `' + refAuthorTag + '` - `' + refPreview + '`]](https://discord.com/channels/' + channel.guildId + '/' + channel.id + '/' + localReferenceId + ')\n';
             }
-            if (!linkedMessageId)
-                return `${failMsg}\n`;
-
-            const reference = await safeFetchMessage(channel, linkedMessageId);
-            if (!reference)
-                return `${failMsg}\n`;
-
-            // Remove first line if it's a reply
-            const msgContent = reference.content.startsWith('[[Reply to ') || reference.content.startsWith('\`[Reply failed\`]') ? reference.content.split('\n').slice(1).join('\n') : reference.content;
-            const authorTag = reference.author.tag.split('@')[0];
-            const preview = msgContent.length + authorTag.length > 50 ? msgContent.substring(0, 50 - authorTag.length) + '...' : msgContent;
-
-            return `[[Reply to \`${authorTag}\` - \`${preview}\`]](<${link}${linkedMessageId}>)\n`;
+            content = createReply() + message.content;
         }
-        if (message.reference) content = await createReply(message.reference) + content || content;
 
         // Get webhook
         const webhook = await getWebhook({ channel, webhookId: portalConnection.webhookId });
         // Send webhook message
         const webhookMessage = await webhook.send({
             content: content,
-            username: `${message.author.tag} @ ${portalConnection.guildName}`,
+            username: `${message.author.tag} ${message.guild?.name ? ` @ ${message.guild.name}` : ''}`,
             avatarURL: message.author.avatarURL() || undefined,
             files: message.attachments.map(a => ({
                 attachment: a.url,
@@ -595,7 +595,7 @@ client.on(Events.MessageCreate, async message => {
             }
         });
 
-        createPortalMessage({ portalId: portalConnection.portalId, messageId: message.id, linkedChannelId: portalConnection.channelId, linkedMessageId: webhookMessage.id });
+        createPortalMessage({ id: portalMessageId, portalId: portalConnection.portalId, messageId: message.id, linkedChannelId: portalConnection.channelId, linkedMessageId: webhookMessage.id });
     }
 });
 
