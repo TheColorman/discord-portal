@@ -517,11 +517,12 @@ client.on(Events.MessageCreate, async message => {
     // Convert unknown emojis
     const emojis = message.content.match(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g);
     const replacement = emojis?.map(e => {
+        const animated = e.startsWith('<a:');
         const id = e.match(/[0-9]+/g)?.[0];
         if (!id) return e;
         const emoji = client.emojis.cache.get(id);
         if (emoji) return emoji.toString();
-        return `https://cdn.discordapp.com/emojis/${id}.webp?size=48&quality=lossless\n`;
+        return `https://cdn.discordapp.com/emojis/${id}.${animated ? 'gif' : 'webp'}?size=48&quality=lossless\n`;
     });
     if (emojis && replacement) {
         // Replace message content matches
