@@ -20,7 +20,10 @@ type Portal = {
     id: string,
     name: string,
     emoji: string,
-    customEmoji: boolean
+    customEmoji: boolean,
+    nsfw: boolean,
+    exclusive: boolean,
+    password: string
 }
 type PortalConnection = {
     portalId: string,
@@ -69,13 +72,13 @@ process.on('uncaughtException', (err) => {
 // Create tables
 console.log('Creating tables...');
 // db.prepare('DROP TABLE portalMessages').run()
-db.prepare('CREATE TABLE IF NOT EXISTS portals (id TEXT PRIMARY KEY, name TEXT, emoji TEXT, customEmoji INTEGER DEFAULT 0)').run()
+db.prepare('CREATE TABLE IF NOT EXISTS portals (id TEXT PRIMARY KEY, name TEXT, emoji TEXT, customEmoji INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, private INTEGER DEFAULT 0, password TEXT)').run()
 db.prepare('CREATE TABLE IF NOT EXISTS portalConnections (portalId TEXT, guildId TEXT, guildName TEXT, channelId TEXT, channelName TEXT, webhookId TEXT, webhookToken TEXT, FOREIGN KEY(portalId) REFERENCES portals(id))').run()
 db.prepare('CREATE TABLE IF NOT EXISTS portalMessages (id TEXT, portalId TEXT, messageId TEXT, linkedChannelId TEXT, linkedMessageId TEXT, FOREIGN KEY(portalId) REFERENCES portals(id))').run()
 // Create default portal if none exists
 if (!db.prepare('SELECT COUNT(1) FROM portals').get()) {
-    db.prepare('INSERT INTO portals (id, name, emoji, customEmoji) VALUES (?, ?, ?, ?)')
-        .run(['123456', 'Genesis', '🎆', false]);
+    db.prepare('INSERT INTO portals (id, name, emoji, customEmoji, nsfw, private, password) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run(['123456', 'Genesis', '🎆', false, false, false, '']);
 }
 
 const client = new Client({ intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildMessageReactions] })
@@ -167,17 +170,33 @@ function checkPermissions(message: Message): boolean {
     return true;
 }
 // Database helpers
-function createPortal({ name, emoji, customEmoji }: { name: string; emoji: string; customEmoji: boolean; }): Portal {
+function createPortal({
+    name,
+    emoji,
+    customEmoji,
+    nsfw,
+    exclusive,
+    password
+}: {
+    name: string;
+    emoji: string;
+    customEmoji: boolean;
+    nsfw: boolean;
+    exclusive: boolean;
+    password: string
+}): Portal {
     const portalId = generatePortalId();
-    db.prepare('INSERT INTO portals (id, name, emoji, customEmoji) VALUES (?, ?, ?, ?)')
-        .run([portalId, name, emoji, Number(customEmoji)]);
-    return { id: portalId, name, emoji, customEmoji };
+    db.prepare('INSERT INTO portals (id, name, emoji, customEmoji, nsfw, private, password) VALUES (?, ?, ?, ?, ?, ?, ?)')
+        .run([portalId, name, emoji, Number(customEmoji), Number(nsfw), Number(exclusive), password]);
+    return { id: portalId, name, emoji, customEmoji, nsfw, exclusive, password };
 }
 function deletePortal(portalId: string): Portal | null {
     const portal = getPortal(portalId);
     if (!portal)
         return null;
     db.prepare('DELETE FROM portalConnections WHERE portalId = ?')
+        .run(portalId);
+    db.prepare('DELETE FROM portalMessages WHERE portalId = ?')
         .run(portalId);
     db.prepare('DELETE FROM portals WHERE id = ?')
         .run(portalId);
@@ -188,12 +207,32 @@ function getPortal(portalId: string): Portal | null {
         .get(portalId);
     if (!portal)
         return null;
-    return { id: portal.id, name: portal.name, emoji: portal.emoji, customEmoji: Boolean(portal.customEmoji) };
+    return {
+        id: portal.id,
+        name: portal.name,
+        emoji: portal.emoji,
+        customEmoji: Boolean(portal.customEmoji),
+        nsfw: Boolean(portal.nsfw),
+        exclusive: Boolean(portal.private),
+        password: portal.password
+    };
 }
 function getPortals(): Collection<PortalId, Portal> {
     const portals = db.prepare('SELECT * FROM portals')
         .all();
-    return new Collection<PortalId, Portal>(portals.map(portal => [portal.id, { id: portal.id, name: portal.name, emoji: portal.emoji, customEmoji: Boolean(portal.customEmoji) }]));
+    return new Collection<PortalId, Portal>(
+        portals.map(
+            portal => [portal.id, {
+                id: portal.id,
+                name: portal.name,
+                emoji: portal.emoji,
+                customEmoji: Boolean(portal.customEmoji),
+                nsfw: Boolean(portal.nsfw),
+                exclusive: Boolean(portal.private),
+                password: portal.password
+            }]
+        )
+    );
 }
 async function createPortalConnection({ portalId, channelId }: { portalId: string; channelId: string; }): Promise<PortalConnection | Error> {
     const channel = await client.channels.fetch(channelId) as TextChannel;
@@ -331,7 +370,7 @@ function getPortalMessageId(messageId: MessageId, linkedMessage?: boolean): Port
 
 // Keep track of setups
 const connectionSetups = new Map<UserId, { channelId: string, portalId: string, expires: number }>();
-const portalSetups = new Map<UserId, { name: string, emoji: string, customEmoji: boolean, portalId: string, channelId: string, expires: number }>();
+const portalSetups = new Map<UserId, { name: string, emoji: string, customEmoji: boolean, portalId: string, channelId: string, nsfw: boolean, exclusive: boolean, password: string, expires: number }>();
 
 client.once(Events.ClientReady, c => {
     console.log(`Ready! Logged in as ${c.user?.tag}`)
@@ -369,7 +408,12 @@ client.on(Events.MessageCreate, async message => {
                 }
                 const portalConnections = getPortalConnections(portalConnection.portalId);
                 message.reply({
-                    content: `Connected to Portal \`#${portal.id}\` - ${portal.emoji}${portal.name}.\nConnection shared with\n${portalConnections.map(c => `• **${c.guildName}** - ${c.channelName}`).join('\n')}`,
+                    content: 'Connected to Portal `#' + 
+                        portal.id + '` - ' + 
+                        portal.emoji + portal.name + (portal.nsfw ?
+                            '🔞' : '') + (portal.exclusive ?
+                            '🔒' : '') + '.\nConnection shared with\n' + 
+                        portalConnections.map(c => `• **${c.guildName}** - ${c.channelName}`).join('\n'),
                 });
                 break;
             }
@@ -422,7 +466,7 @@ client.on(Events.MessageCreate, async message => {
                                     maxValues: 1,
                                     minValues: 1,
                                     options: portals.map(p => ({
-                                        label: `${p.customEmoji ? '' : p.emoji}${p.name}`,
+                                        label: `${p.customEmoji ? '' : p.emoji}${p.name}${p.nsfw ? '🔞' : ''}${p.exclusive ? '🔒' : ''}`,
                                         value: p.id
                                     })),
                                     placeholder: 'Select a Portal'
@@ -518,7 +562,8 @@ client.on(Events.MessageCreate, async message => {
     const emojis = message.content.match(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g);
     const replacement = emojis?.map(e => {
         const animated = e.startsWith('<a:');
-        const id = e.match(/[0-9]+/g)?.[0];
+        // Match all numbers after :
+        const id = e.match(/:[0-9]+>/)?.[0].slice(1, -1);
         if (!id) return e;
         const emoji = client.emojis.cache.get(id);
         if (emoji) return emoji.toString();
@@ -679,42 +724,326 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     }
 });
 
-client.on(Events.InteractionCreate, async interaction => {
+// Channel updates
+client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
+    // Return if not a text channel
+    if (newChannel.type !== ChannelType.GuildText) return;
+
+    // Check if channel is a portal channel
+    const portalConnection = getPortalConnection(newChannel.id);
+    if (!portalConnection) return;
+
+    // Update portal connection
+    updatePortalConnection(newChannel.id, { channelName: newChannel.name, guildName: newChannel.guild.name });
+
+    // Check of nsfw change
+    const portal = getPortal(portalConnection.portalId);
+    if (!portal) return;
+    // Suspend portal if nsfw changed
+    if (portal.nsfw !== newChannel.nsfw) {
+        // TODO: Not implemented
+    }
+})
+
+client.on(Events.InteractionCreate, async interaction => { //TODO: Clean up this fucking mess. ANONYMOUS FUNCTIONS PLEASE
+    // Return if not a text channel
+    if (!interaction.channel || interaction.channel.type !== ChannelType.GuildText) return;
     try { // Try because discord.js is shit and throws errors for no reason
         // Join portal
         if (interaction.isStringSelectMenu()) {
-            if (interaction.customId !== 'portalSelect') return;
-            const portalId = interaction.values[0];
-            const portal = getPortal(portalId);
-
-            // Add portal to setup
-            const setup = connectionSetups.get(interaction.user.id);
-            if (!setup) return sendExpired(interaction);
-            setup.portalId = portalId;
-            setup.expires = Date.now() + 60000;
-
-            // Edit original message
-            interaction.update({
-                content: `__Selected channel:__ <#${setup.channelId}>.\n__Selected Portal:__ ${portal?.emoji}${portal?.name}.\n${portalIntro.confirm}`,
-                components: [
-                    {
-                        type: ComponentType.ActionRow,
+            switch (interaction.customId) {
+                case 'portalSelect': {
+                    const portalId = interaction.values[0];
+                    const portal = getPortal(portalId);
+        
+                    // Add portal to setup
+                    const setup = connectionSetups.get(interaction.user.id);
+                    if (!setup) return sendExpired(interaction);
+                    setup.portalId = portalId;
+                    setup.expires = Date.now() + 60000;
+        
+                    if (portal?.nsfw && !interaction.channel.nsfw) {
+                        interaction.reply({ content: 'You can only join NSFW Portals from NSFW channels.', ephemeral: true });
+                        return;
+                    }
+                    if (!portal?.exclusive) {
+                        // Edit original message
+                        interaction.update({
+                            content: `__Selected channel:__ <#${setup.channelId}>.\n__Selected Portal:__ ${portal?.emoji}${portal?.name}.\n${portalIntro.confirm}`,
+                            components: [
+                                {
+                                    type: ComponentType.ActionRow,
+                                    components: [
+                                        {
+                                            type: ComponentType.Button,
+                                            customId: 'portalJoin',
+                                            label: 'Join Portal',
+                                            style: ButtonStyle.Success
+                                        }, {
+                                            type: ComponentType.Button,
+                                            customId: 'portalSelectCancel',
+                                            label: 'Cancel',
+                                            style: ButtonStyle.Danger
+                                        }
+                                    ]
+                                }
+                            ]
+                        });
+                        return;
+                    }
+                    // Modal for exclusive portals
+                    await interaction.showModal({
+                        title: `Join ${portal?.emoji}${portal?.name}`,
+                        customId: 'portalPasswordPrompt',
                         components: [
                             {
-                                type: ComponentType.Button,
-                                customId: 'portalJoin',
-                                label: 'Join Portal',
-                                style: ButtonStyle.Success
-                            }, {
-                                type: ComponentType.Button,
-                                customId: 'portalSelectCancel',
-                                label: 'Cancel',
-                                style: ButtonStyle.Danger
+                                type: ComponentType.ActionRow,
+                                components: [
+                                    {
+                                        type: ComponentType.TextInput,
+                                        customId: 'portalPassword',
+                                        label: `Enter Password for ${portal?.emoji}${portal?.name}`,
+                                        placeholder: "Password",
+                                        maxLength: 64,
+                                        minLength: 1,
+                                        style: TextInputStyle.Short
+                                    }
+                                ]
                             }
                         ]
+                    });
+                    break;
+                }
+                case 'portalCreateNsfw': {
+                    const portalCreation = portalSetups.get(interaction.user.id);
+                    const setup = connectionSetups.get(interaction.user.id);
+                    if (!portalCreation || !setup) return sendExpired(interaction);
+
+                    const nsfw = interaction.values[0] === 'nsfw';
+
+                    portalCreation.expires = Date.now() + 60000;
+
+                    if (!interaction.channel.nsfw) {
+                        await interaction.reply({ content: 'NSFW portals can only be created in NSFW channels.', ephemeral: true });
+                        interaction.message.edit({
+                            content: `__Selected channel:__ <#${portalCreation.channelId}>.\n**Do you want to create a new Portal?**\n${portalCreation.emoji}${portalCreation.name}${portalCreation.nsfw ? '🔞' : ''}${portalCreation.exclusive ? `🔒\nPassword: \`${portalCreation.password}\`` : ''}`,
+                            components: [
+                                {
+                                    type: ComponentType.ActionRow,
+                                    components: [
+                                        {
+                                            type: ComponentType.StringSelect,
+                                            customId: 'portalCreateNsfw',
+                                            maxValues: 1,
+                                            minValues: 1,
+                                            options: [{
+                                                label: 'SFW',
+                                                value: 'sfw',
+                                                default: true
+                                            }, {
+                                                label: '🔞NSFW',
+                                                value: 'nsfw',
+                                            }]
+                                        }
+                                    ]
+                                }, {
+                                    type: ComponentType.ActionRow,
+                                    components: [
+                                        {
+                                            type: ComponentType.StringSelect,
+                                            customId: 'portalCreateExclusive',
+                                            maxValues: 1,
+                                            minValues: 1,
+                                            options: [{
+                                                label: '🔒Private',
+                                                value: 'exclusive',
+                                                default: portalCreation.exclusive
+                                            }, {
+                                                label: 'Public',
+                                                value: 'public',
+                                                default: !portalCreation.exclusive
+                                            }]
+                                        }
+                                    ]
+                                }, {
+                                    type: ComponentType.ActionRow,
+                                    components: [
+                                        {
+                                            type: ComponentType.Button,
+                                            customId: 'portalCreateConfirm',
+                                            label: 'Create and join Portal',
+                                            style: ButtonStyle.Success
+                                        }, {
+                                            type: ComponentType.Button,
+                                            customId: 'portalCreateCancel',
+                                            label: 'Cancel',
+                                            style: ButtonStyle.Danger
+                                        }
+                                    ]
+                                }
+                            ]
+                        })
+                        break;
                     }
-                ]
-            });
+
+                    portalCreation.nsfw = nsfw;
+
+                    // Acknowledge interaction but don't send a response
+                    await interaction.update({
+                        content: `__Selected channel:__ <#${portalCreation.channelId}>.\n**Do you want to create a new Portal?**\n${portalCreation.emoji}${portalCreation.name}${portalCreation.nsfw ? '🔞' : ''}${portalCreation.exclusive ? `🔒\nPassword: \`${portalCreation.password}\`` : ''}`,
+                        components: [
+                            {
+                                type: ComponentType.ActionRow,
+                                components: [
+                                    {
+                                        type: ComponentType.StringSelect,
+                                        customId: 'portalCreateNsfw',
+                                        maxValues: 1,
+                                        minValues: 1,
+                                        options: [{
+                                            label: '🔞NSFW',
+                                            value: 'nsfw',
+                                            default: portalCreation.nsfw
+                                        }, {
+                                            label: 'SFW',
+                                            value: 'sfw',
+                                            default: !portalCreation.nsfw
+                                        }]
+                                    }
+                                ]
+                            }, {
+                                type: ComponentType.ActionRow,
+                                components: [
+                                    {
+                                        type: ComponentType.StringSelect,
+                                        customId: 'portalCreateExclusive',
+                                        maxValues: 1,
+                                        minValues: 1,
+                                        options: [{
+                                            label: '🔒Private',
+                                            value: 'exclusive',
+                                            default: portalCreation.exclusive
+                                        }, {
+                                            label: 'Public',
+                                            value: 'public',
+                                            default: !portalCreation.exclusive
+                                        }]
+                                    }
+                                ]
+                            }, {
+                                type: ComponentType.ActionRow,
+                                components: [
+                                    {
+                                        type: ComponentType.Button,
+                                        customId: 'portalCreateConfirm',
+                                        label: 'Create and join Portal',
+                                        style: ButtonStyle.Success
+                                    }, {
+                                        type: ComponentType.Button,
+                                        customId: 'portalCreateCancel',
+                                        label: 'Cancel',
+                                        style: ButtonStyle.Danger
+                                    }
+                                ]
+                            }
+                        ]
+                    });
+                    break;
+                }
+                case 'portalCreateExclusive': {
+                    const portalCreation = portalSetups.get(interaction.user.id);
+                    if (!portalCreation) break;
+
+                    const exclusive = interaction.values[0] === 'exclusive';
+
+                    portalCreation.expires = Date.now() + 60000;
+                    portalCreation.exclusive = false;
+
+                    if (!exclusive) { // Public, no need to request password
+                        await interaction.update({
+                            content: `__Selected channel:__ <#${portalCreation.channelId}>.\n**Do you want to create a new Portal?**\n${portalCreation.emoji}${portalCreation.name}${portalCreation.nsfw ? '🔞' : ''}${portalCreation.exclusive ? `🔒\nPassword: \`${portalCreation.password}\`` : ''}`,
+                            components: [
+                                {
+                                    type: ComponentType.ActionRow,
+                                    components: [
+                                        {
+                                            type: ComponentType.StringSelect,
+                                            customId: 'portalCreateNsfw',
+                                            maxValues: 1,
+                                            minValues: 1,
+                                            options: [{
+                                                label: '🔞NSFW',
+                                                value: 'nsfw',
+                                                default: portalCreation.nsfw
+                                            }, {
+                                                label: 'SFW',
+                                                value: 'sfw',
+                                                default: !portalCreation.nsfw
+                                            }]
+                                        }
+                                    ]
+                                }, {
+                                    type: ComponentType.ActionRow,
+                                    components: [
+                                        {
+                                            type: ComponentType.StringSelect,
+                                            customId: 'portalCreateExclusive',
+                                            maxValues: 1,
+                                            minValues: 1,
+                                            options: [{
+                                                label: '🔒Private',
+                                                value: 'exclusive',
+                                                default: portalCreation.exclusive
+                                            }, {
+                                                label: 'Public',
+                                                value: 'public',
+                                                default: !portalCreation.exclusive
+                                            }]
+                                        }
+                                    ]
+                                }, {
+                                    type: ComponentType.ActionRow,
+                                    components: [
+                                        {
+                                            type: ComponentType.Button,
+                                            customId: 'portalCreateConfirm',
+                                            label: 'Create and join Portal',
+                                            style: ButtonStyle.Success
+                                        }, {
+                                            type: ComponentType.Button,
+                                            customId: 'portalCreateCancel',
+                                            label: 'Cancel',
+                                            style: ButtonStyle.Danger
+                                        }
+                                    ]
+                                }
+                            ]
+                        });
+                        break;
+                    }
+                    // Request password
+                    await interaction.showModal({
+                        title: 'Choose a password for your Private Portal',
+                        customId: 'portalPasswordCreate',
+                        components: [
+                            {
+                                type: ComponentType.ActionRow,
+                                components: [
+                                    {
+                                        type: ComponentType.TextInput,
+                                        customId: 'portalPassword',
+                                        label: 'Enter Portal password',
+                                        placeholder: "Never use an important password, such as for your Discord or Bank account.",
+                                        maxLength: 64,
+                                        minLength: 1,
+                                        style: TextInputStyle.Short
+                                    }
+                                ]
+                            }
+                        ]
+                    });
+                }
+            }
         }
 
         // Buttons
@@ -768,7 +1097,7 @@ client.on(Events.InteractionCreate, async interaction => {
                     const portalSetup = portalSetups.get(interaction.user.id);
                     if (!portalSetup) return sendExpired(interaction);
 
-                    const portal = createPortal({ name: portalSetup.name, emoji: portalSetup.emoji, customEmoji: portalSetup.customEmoji });
+                    const portal = createPortal({ name: portalSetup.name, emoji: portalSetup.emoji, customEmoji: portalSetup.customEmoji, nsfw: portalSetup.nsfw, exclusive: portalSetup.exclusive, password: portalSetup.password });
                     portalSetups.delete(interaction.user.id);
 
                     const portalConnection = await createPortalConnection({ portalId: portal.id, channelId: portalSetup.channelId });
@@ -777,7 +1106,7 @@ client.on(Events.InteractionCreate, async interaction => {
                         return;
                     }
                     interaction.update({
-                        content: `Created and joined Portal \`#${portalConnection.portalId}\` - ${portal.emoji}${portal.name}.`,
+                        content: `Created and joined Portal \`#${portalConnection.portalId}\` - ${portal.emoji}${portal.name}${portal.nsfw ? '🔞' : ''}${portal.exclusive ? '🔒' : ''}.`,
                         components: []
                     });
                     break;
@@ -809,58 +1138,173 @@ client.on(Events.InteractionCreate, async interaction => {
 
         // Create new portal
         if (interaction.isModalSubmit() && interaction.isFromMessage()) {
-            if (interaction.customId !== 'portalCreateModal') return;
-            const setup = connectionSetups.get(interaction.user.id);
-            if (!setup) return sendExpired(interaction);
-            const portalName = interaction.fields.getTextInputValue('portalName');
-
-            // Add portal to portalCreations
-            portalSetups.set(interaction.user.id, {
-                name: portalName,
-                emoji: '',
-                customEmoji: false,
-                portalId: '',
-                channelId: setup.channelId,
-                expires: Date.now() + 60000
-            });
-            setTimeout(() => {
-                // Remove portalCreation if not completed
-                if (portalSetups.has(interaction.user.id)) portalSetups.delete(interaction.user.id);
-            }, 60000);
-
-            // Edit original message
-            interaction.update({
-                content: `__Selected channel:__ <#${setup.channelId}>.\n__Portal name:__ ${portalName}.\nReact to this message with the emoji you want to use for your Portal.`,
-                components: []
-            });
-
-            // Wait for emoji
-            const filter = (_reaction: MessageReaction, user: User) => user.id === interaction.user.id;
-
-            interaction.message.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
-                .then(async collected => {
-                    // Add to portalCreations
-                    const reaction = collected.first();
-                    if (!reaction) {
-                        interaction.channel?.send('You did not react with an emoji in time.');
-                        return;
-                    }
+            switch (interaction.customId) {
+                case 'portalCreateModal': {
+                    const setup = connectionSetups.get(interaction.user.id);
+                    if (!setup) return sendExpired(interaction);
+                    const portalName = interaction.fields.getTextInputValue('portalName');
+        
+                    // Add portal to portalCreations
+                    portalSetups.set(interaction.user.id, {
+                        name: portalName,
+                        emoji: '',
+                        customEmoji: false,
+                        portalId: '',
+                        channelId: setup.channelId,
+                        nsfw: false,
+                        exclusive: false,
+                        password: '',
+                        expires: Date.now() + 60000
+                    });
+                    setTimeout(() => {
+                        // Remove portalCreation if not completed
+                        if (portalSetups.has(interaction.user.id)) portalSetups.delete(interaction.user.id);
+                    }, 60000);
+        
+                    // Edit original message
+                    interaction.update({
+                        content: `__Selected channel:__ <#${setup.channelId}>.\n__Portal name:__ ${portalName}.\nReact to this message with the emoji you want to use for your Portal.`,
+                        components: []
+                    });
+        
+                    // Wait for emoji
+                    const filter = (_reaction: MessageReaction, user: User) => user.id === interaction.user.id;
+        
+                    interaction.message.awaitReactions({ filter, max: 1, time: 60000, errors: ['time'] })
+                        .then(async collected => {
+                            // Add to portalCreations
+                            const reaction = collected.first();
+                            if (!reaction) {
+                                interaction.channel?.send('You did not react with an emoji in time.');
+                                return;
+                            }
+                            const portalCreation = portalSetups.get(interaction.user.id);
+                            if (!portalCreation) return sendExpired(interaction);
+        
+                            portalCreation.emoji = reaction.emoji.toString() || '';
+                            portalCreation.customEmoji = reaction.emoji.id ? true : false;
+                            portalCreation.portalId = generatePortalId();
+        
+                            portalSetups.set(interaction.user.id, portalCreation);
+        
+                            reaction.remove();
+        
+                            // Edit original message
+                            interaction.message.edit({
+                                content: `__Selected channel:__ <#${portalCreation.channelId}>.\n**Do you want to create a new Portal?**\n${portalCreation.emoji}${portalCreation.name}${portalCreation.nsfw ? '🔞' : ''}${portalCreation.exclusive ? `🔒\nPassword: \`${portalCreation.password}\`` : ''}`,
+                                components: [
+                                    {
+                                        type: ComponentType.ActionRow,
+                                        components: [
+                                            {
+                                                type: ComponentType.StringSelect,
+                                                customId: 'portalCreateNsfw',
+                                                maxValues: 1,
+                                                minValues: 1,
+                                                options: [{
+                                                    label: '🔞NSFW',
+                                                    value: 'nsfw',
+                                                    default: portalCreation.nsfw
+                                                }, {
+                                                    label: 'SFW',
+                                                    value: 'sfw',
+                                                    default: !portalCreation.nsfw
+                                                }]
+                                            }
+                                        ]
+                                    }, {
+                                        type: ComponentType.ActionRow,
+                                        components: [
+                                            {
+                                                type: ComponentType.StringSelect,
+                                                customId: 'portalCreateExclusive',
+                                                maxValues: 1,
+                                                minValues: 1,
+                                                options: [{
+                                                    label: '🔒Private',
+                                                    value: 'exclusive',
+                                                }, {
+                                                    label: 'Public',
+                                                    value: 'public',
+                                                    default: true
+                                                }]
+                                            }
+                                        ]
+                                    }, {
+                                        type: ComponentType.ActionRow,
+                                        components: [
+                                            {
+                                                type: ComponentType.Button,
+                                                customId: 'portalCreateConfirm',
+                                                label: 'Create and join Portal',
+                                                style: ButtonStyle.Success
+                                            }, {
+                                                type: ComponentType.Button,
+                                                customId: 'portalCreateCancel',
+                                                label: 'Cancel',
+                                                style: ButtonStyle.Danger
+                                            }
+                                        ]
+                                    }
+                                ]
+                            });
+                        }).catch(() => {
+                            interaction.channel?.send('You did not react with an emoji in time.');
+                        });
+                    break;
+                }
+                case 'portalPasswordCreate': {
                     const portalCreation = portalSetups.get(interaction.user.id);
+                    const setup = connectionSetups.get(interaction.user.id);
                     if (!portalCreation) return sendExpired(interaction);
+                    if (!setup) return sendExpired(interaction);
 
-                    portalCreation.emoji = reaction.emoji.toString() || '';
-                    portalCreation.customEmoji = reaction.emoji.id ? true : false;
-                    portalCreation.portalId = generatePortalId();
-
+                    const password = interaction.fields.getTextInputValue('portalPassword');
+                    portalCreation.password = password;
+                    portalCreation.exclusive = true;
                     portalSetups.set(interaction.user.id, portalCreation);
 
-                    reaction.remove();
-
-                    // Edit original message
-                    interaction.message.edit({
-                        content: `__Selected channel:__ <#${setup.channelId}>.\n**Do you want to create a new Portal?**\n${portalCreation.emoji}${portalCreation.name}.`,
+                    interaction.update({
+                        content: `__Selected channel:__ <#${portalCreation.channelId}>.\n**Do you want to create a new Portal?**\n${portalCreation.emoji}${portalCreation.name}${portalCreation.nsfw ? '🔞' : ''}${portalCreation.exclusive ? `🔒\nPassword: \`${portalCreation.password}\`` : ''}`,
                         components: [
                             {
+                                type: ComponentType.ActionRow,
+                                components: [ 
+                                    {
+                                        type: ComponentType.StringSelect,
+                                        customId: 'portalCreateNsfw',
+                                        maxValues: 1,
+                                        minValues: 1,
+                                        options: [{
+                                            label: '🔞NSFW',
+                                            value: 'nsfw',
+                                            default: portalCreation.nsfw
+                                        }, {
+                                            label: 'SFW',
+                                            value: 'sfw',
+                                            default: !portalCreation.nsfw
+                                        }]
+                                    }
+                                ]
+                            }, {
+                                type: ComponentType.ActionRow,
+                                components: [
+                                    {
+                                        type: ComponentType.StringSelect,
+                                        customId: 'portalCreateExclusive',
+                                        maxValues: 1,
+                                        minValues: 1,
+                                        options: [{
+                                            label: '🔒Private',
+                                            value: 'exclusive',
+                                            default: true
+                                        }, {
+                                            label: 'Public',
+                                            value: 'public',
+                                        }]
+                                    }
+                                ]
+                            }, {
                                 type: ComponentType.ActionRow,
                                 components: [
                                     {
@@ -878,9 +1322,86 @@ client.on(Events.InteractionCreate, async interaction => {
                             }
                         ]
                     });
-                }).catch(() => {
-                    interaction.channel?.send('You did not react with an emoji in time.');
-                });
+                    break;
+                }
+                case 'portalPasswordPrompt': {
+                    const setup = connectionSetups.get(interaction.user.id);
+                    if (!setup) return sendExpired(interaction);
+
+                    const password = interaction.fields.getTextInputValue('portalPassword');
+                    if (!password) return sendExpired(interaction);
+
+                    const portal = getPortal(setup.portalId)
+                    if (!portal) return sendExpired(interaction);
+
+                    if (portal.password !== password) {
+                        interaction.reply({
+                            content: 'Incorrect password.',
+                            ephemeral: true
+                        });
+                        const portals = getPortals();
+                        interaction.message.edit({
+                            content: `__Selected channel:__ <#${interaction.channel.id}>.\n${portalIntro.portal}.`,
+                            components: [
+                                {
+                                    type: ComponentType.ActionRow,
+                                    components: [
+                                        {
+                                            type: ComponentType.StringSelect,
+                                            customId: 'portalSelect',
+                                            maxValues: 1,
+                                            minValues: 1,
+                                            options: portals.map(p => ({
+                                                label: `${p.customEmoji ? '' : p.emoji}${p.name}${p.nsfw ? '🔞' : ''}${p.exclusive ? '🔒' : ''}`,
+                                                value: p.id
+                                            })),
+                                            placeholder: 'Select a Portal'
+                                        }
+                                    ]
+                                }, {
+                                    type: ComponentType.ActionRow,
+                                    components: [
+                                        {
+                                            type: ComponentType.Button,
+                                            customId: 'portalCreate',
+                                            label: 'Create new Portal',
+                                            style: ButtonStyle.Primary
+                                        }, {
+                                            type: ComponentType.Button,
+                                            customId: 'portalSelectCancel',
+                                            label: 'Cancel',
+                                            style: ButtonStyle.Danger
+                                        }
+                                    ]
+                                }
+                            ]
+                        });
+                        return;
+                    }
+                    // Edit original message
+                    interaction.update({
+                        content: `__Selected channel:__ <#${setup.channelId}>.\n__Selected Portal:__ ${portal.emoji}${portal.name}${portal.nsfw ? '🔞' : ''}🔒.\n${portalIntro.confirm}`,
+                        components: [
+                            {
+                                type: ComponentType.ActionRow,
+                                components: [
+                                    {
+                                        type: ComponentType.Button,
+                                        customId: 'portalJoin',
+                                        label: 'Join Portal',
+                                        style: ButtonStyle.Success
+                                    }, {
+                                        type: ComponentType.Button,
+                                        customId: 'portalSelectCancel',
+                                        label: 'Cancel',
+                                        style: ButtonStyle.Danger
+                                    }
+                                ]
+                            }
+                        ]
+                    });
+                }
+            }
         }
     } catch (err) {
         // Probably timed out
