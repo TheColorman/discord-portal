@@ -66,6 +66,7 @@ process.on('exit', () => {
 });
 // Prevent crashes
 process.on('uncaughtException', (err) => {
+    console.log('Uncaught exception!');
     console.error(err);
 });
 
@@ -116,6 +117,7 @@ async function editMessage(channel: TextChannel, messageId: string, options: str
         const webhook = await getWebhook({ channel, webhookId: portalConnection.webhookId });
         return await webhook.editMessage(messageId, options);
     } catch (err) {
+        console.log('Failed to edit message using webhook.');
         console.error(err);
         return null;
     }
@@ -1405,6 +1407,7 @@ client.on(Events.InteractionCreate, async interaction => { //TODO: Clean up this
         }
     } catch (err) {
         // Probably timed out
+        console.log('Error in interaction');
         console.error(err);
     }
 });
