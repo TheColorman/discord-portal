@@ -1067,7 +1067,7 @@ client.on(Events.InteractionCreate, async interaction => { //TODO: Clean up this
                         return;
                     }
                     interaction.update({
-                        content: `Joined \`$${portal.id}\` - ${portal.emoji}${portal.name}!`,
+                        content: `Joined \`#${portal.id}\` - ${portal.emoji}${portal.name}!`,
                         components: []
                     });
                     break;
