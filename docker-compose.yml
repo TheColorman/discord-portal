@@ -4,7 +4,7 @@ services:
     # image: "arm64v8/node:19-alpine"
     build: .
     container_name: "portal-bot"
-    user: node:1002
+    user: node:1001
     working_dir: /home/node/app
     environment:
       - NODE_ENV=production
@@ -12,5 +12,5 @@ services:
       - ./:/home/node/app
     security_opt:
       - seccomp:unconfined
-    command: npm run start
+    command: npm run setup
     restart: unless-stopped
