@@ -331,6 +331,7 @@ async function editMessage(
             channel,
             webhookId: portalConnection.webhookId,
         });
+        if (!webhook) return Error("No webhook found.");
         return await webhook.editMessage(messageId, options);
     } catch (err) {
         console.log("Failed to edit message using webhook.");
@@ -352,6 +353,7 @@ async function deleteMessage(
             channel,
             webhookId: portalConnection?.webhookId,
         });
+        if (!webhook) throw Error("No webhook found.");
         await webhook.deleteMessage(messageId);
 
         return message;
@@ -364,6 +366,17 @@ async function deleteMessage(
             // We don't have permission to delete the message
             return Error("No permission to delete message.");
         }
+    }
+}
+async function safeFetchChannel(
+    channelId: string
+): Promise<TextChannel | null> {
+    try {
+        return (await client.channels.fetch(channelId)) as TextChannel;
+    } catch (err) {
+        console.log("Failed to fetch channel.");
+        console.error(err);
+        return null;
     }
 }
 async function createWebhook(channel: TextChannel): Promise<Webhook> {
@@ -379,9 +392,13 @@ async function getWebhook({
 }: {
     channel: string | TextChannel;
     webhookId?: string;
-}): Promise<Webhook> {
-    if (typeof channel === "string")
-        channel = (await client.channels.fetch(channel)) as TextChannel;
+}): Promise<Webhook | null> {
+    if (typeof channel === "string") {
+        const fetchedChannel = await safeFetchChannel(channel);
+        if (!fetchedChannel) return null;
+        channel = fetchedChannel;
+    }
+
     if (!webhookId) return createWebhook(channel);
     const webhook = (await channel.fetchWebhooks()).get(webhookId);
     if (!webhook) {
@@ -399,8 +416,9 @@ async function deleteWebhook({
 }: {
     channel: string | TextChannel;
     webhookId?: string;
-}): Promise<Webhook> {
+}): Promise<Webhook | null> {
     const webhook = await getWebhook({ channel, webhookId });
+    if (!webhook) return null;
     webhook.delete();
     return webhook;
 }
@@ -517,9 +535,10 @@ async function createPortalConnection({
     channelId: string;
     guildInvite?: string;
 }): Promise<PortalConnection | Error> {
-    const channel = (await client.channels.fetch(channelId)) as TextChannel;
+    const channel = await safeFetchChannel(channelId);
     if (!channel) return Error("Channel not found.");
     const webhook = await getWebhook({ channel });
+    if (!webhook) return Error("Failed to create webhook.");
     db.prepare(
         "INSERT INTO portalConnections (portalId, guildId, guildName, channelId, channelName, guildInvite, webhookId, webhookToken) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
     ).run([
@@ -858,9 +877,7 @@ client.on(Events.MessageCreate, async (message) => {
             if (portalConnection.channelId === message.channel.id) return;
 
             // Get channel
-            const channel = (await client.channels.fetch(
-                portalConnection.channelId
-            )) as TextChannel | null;
+            const channel = await safeFetchChannel(portalConnection.channelId);
             if (!channel) {
                 // Remove connection if channel is not found
                 deletePortalConnection(portalConnection.channelId);
@@ -907,6 +924,11 @@ client.on(Events.MessageCreate, async (message) => {
                 channel,
                 webhookId: portalConnection.webhookId,
             });
+            // If no webhook was found, the channel doesn't exist and we should delete the connection
+            if (!webhook) {
+                deletePortalConnection(portalConnection.channelId);
+                return;
+            }
             // Send webhook message
             const webhookMessage = await webhook.send({
                 content: content,
@@ -965,15 +987,19 @@ client.on(Events.MessageCreate, async (message) => {
                 );
 
                 portalConnections.forEach(async (portalConnection) => {
-                    const channel = await client.channels.fetch(
+                    const channel = await safeFetchChannel(
                         portalConnection.channelId
                     );
-                    if (!channel || channel.type !== ChannelType.GuildText)
-                        return;
+                    if (!channel) return;
                     const webhook = await getWebhook({
                         channel: channel,
                         webhookId: portalConnection.webhookId,
                     });
+                    // If no webhook was found, the channel doesn't exist and we should delete the connection
+                    if (!webhook) {
+                        deletePortalConnection(portalConnection.channelId);
+                        return;
+                    }
 
                     let portalMessageId = getPortalMessageId(message.id);
                     if (!portalMessageId) {
@@ -993,19 +1019,6 @@ client.on(Events.MessageCreate, async (message) => {
                                       portalConnection.channelId
                               )?.linkedMessageId
                             : undefined;
-
-                    const replytext = replyId
-                        ? // Limit length of reply preview to 40 characters
-                          `[[Reply to \`${
-                              message.author.tag
-                          }\` - \`${message.content
-                              .replace("\n", " ")
-                              .trim()}\`]](https://discord.com/channels/${
-                              channel.guildId
-                          }/${channel.id}/${replyId})`
-                        : `\`[Reply failed]\``;
-
-                    console.log(replytext);
 
                     webhook.send({
                         content:
@@ -1216,9 +1229,7 @@ client.on(Events.MessageDelete, async (message) => {
     // Delete linked messages
     for (const [messageId, portalMessage] of portalMessages) {
         // Find channel and message objects
-        const channel = (await client.channels.fetch(
-            portalMessage.linkedChannelId
-        )) as TextChannel | null;
+        const channel = await safeFetchChannel(portalMessage.linkedChannelId);
         if (!channel) continue;
         const message = await safeFetchMessage(
             channel,
@@ -1254,9 +1265,7 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     // Edit linked messages
     for (const [messageId, portalMessage] of portalMessages) {
         // Find channel and message objects
-        const channel = (await client.channels.fetch(
-            portalMessage.linkedChannelId
-        )) as TextChannel | null;
+        const channel = await safeFetchChannel(portalMessage.linkedChannelId);
         if (!channel) continue;
         const message = await safeFetchMessage(
             channel,
