@@ -1061,7 +1061,10 @@ client.on(Events.MessageCreate, async (message) => {
                                 )
                                 .join("\n"),
                         avatarURL: message.client.user.avatarURL() || "",
-                        username: message.client.user.username,
+                        username:
+                            portalConnection.guildId === message.guildId
+                                ? message.client.user.username
+                                : `${message.client.user.username} @ ${message.guild?.name}`,
                     });
                 });
                 break;
