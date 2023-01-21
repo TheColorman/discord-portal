@@ -223,9 +223,9 @@ const portalIntro = {
 };
 
 // Database
-    db.close();
 const db = sqlite3("./db.sqlite");
 process.on("exit", () => {
+    db.close();
 });
 // Prevent crashes
 process.on("uncaughtException", (err) => {
