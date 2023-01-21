@@ -1252,7 +1252,9 @@ client.on(Events.MessageDelete, async (message) => {
     if (message.webhookId) return;
 
     // Check if message is a portal message
-    const portalMessages = getPortalMessages(message.id);
+    const portalMessageId = getPortalMessageId(message.id);
+    if (!portalMessageId) return;
+    const portalMessages = getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
     // Delete linked messages
@@ -1288,7 +1290,9 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     if (newMessage.webhookId) return;
 
     // Check if message is a portal message
-    const portalMessages = getPortalMessages(newMessage.id);
+    const portalMessageId = getPortalMessageId(newMessage.id);
+    if (!portalMessageId) return;
+    const portalMessages = getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
     // Edit linked messages
