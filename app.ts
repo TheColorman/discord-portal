@@ -990,7 +990,11 @@ client.on(Events.MessageCreate, async (message) => {
                     const channel = await safeFetchChannel(
                         portalConnection.channelId
                     );
-                    if (!channel) return;
+                    // If no channel was found, the channel doesn't exist and we should delete the connection
+                    if (!channel) {
+                        deletePortalConnection(portalConnection.channelId);
+                        return;
+                    }
                     const webhook = await getWebhook({
                         channel: channel,
                         webhookId: portalConnection.webhookId,
