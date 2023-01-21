@@ -1052,7 +1052,7 @@ client.on(Events.MessageCreate, async (message) => {
             case "invite":
             case "link": {
                 message.reply(
-                    "Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=537263168&scope=bot"
+                    "Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275415170113&scope=bot"
                 );
                 break;
             }
