@@ -1555,7 +1555,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                                         customId: "portalPassword",
                                         label: "Enter Portal password",
                                         placeholder:
-                                            "Never use an important password, such as for your Discord or Bank account.",
+                                            "Anyone with access to the portal will be able to see the password.",
                                         maxLength: 64,
                                         minLength: 1,
                                         style: TextInputStyle.Short,
