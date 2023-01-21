@@ -745,6 +745,9 @@ client.on(Events.MessageCreate, async (message) => {
                         portal.name +
                         (portal.nsfw ? "🔞" : "") +
                         (portal.exclusive ? "🔒" : "") +
+                        (portal.password
+                            ? "\nPassword: ||" + portal.password + "||"
+                            : "") +
                         ".\nConnection shared with\n" +
                         portalConnections
                             .map(
