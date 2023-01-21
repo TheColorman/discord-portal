@@ -375,7 +375,7 @@ async function safeFetchChannel(
         return (await client.channels.fetch(channelId)) as TextChannel;
     } catch (err) {
         console.log("Failed to fetch channel.");
-        console.error(err);
+        // console.error(err);
         return null;
     }
 }
