@@ -883,6 +883,8 @@ client.on(Events.MessageCreate, async (message) => {
                 return;
             }
 
+            let newContent = content.slice();
+
             // Add replies
             if (originalReference) {
                 const buildReply = () => {
@@ -915,7 +917,7 @@ client.on(Events.MessageCreate, async (message) => {
                         ")\n"
                     );
                 };
-                content = buildReply() + message.content;
+                newContent = buildReply() + message.content;
             }
 
             // Get webhook
