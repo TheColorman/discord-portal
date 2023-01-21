@@ -823,9 +823,12 @@ client.on(Events.MessageCreate, async (message) => {
             if (!originalReference) return failed;
 
             // Remove first line if it starts with "`[Reply failed]`" or "[[Reply to `"
-            const refContent = (
-                originalReference.content.startsWith("`[Reply failed]`") ||
-                originalReference.content.startsWith("[[Reply to `")
+            const refContent = (                                    // check if content is a link to cdn.discordapp.com/attachments or media.discordapp.net/attachments
+                originalReference.content === "" || originalReference.content.trim().match(/https?:\/\/(cdn|media)\.discordapp\.com\/attachments/)
+                    ? "(Click to see attachment 🖾)"
+                    : originalReference.content.startsWith(
+                          "`[Reply failed]`"
+                      ) || originalReference.content.startsWith("[[Reply to `")
                     ? originalReference.content.split("\n").slice(1).join("\n")
                     : originalReference.content
             )
