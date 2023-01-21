@@ -764,7 +764,7 @@ client.on(Events.MessageCreate, async (message) => {
             case "help":
             case "commands": {
                 message.reply(
-                    "`?portal` - Get information about the Portal connection of the current channel.\n`?join` - Join a Portal.\n`?leave` - Leave a Portal.\n`?delete` - Delete a Portal.\n`?invite` - Get an invite link for the bot.\n`?help` - Get a list of commands."
+                    `\`${prefix}portal\` - Get information about the Portal connection of the current channel.\n\`${prefix}join\` - Join a Portal.\n\`${prefix}leave\` - Leave a Portal.\n\`${prefix}delete\` - Delete a Portal.\n\`${prefix}invite\` - Get an invite link for the bot.\n\`${prefix}help\` - Get a list of commands.`
                 );
                 break;
             }
