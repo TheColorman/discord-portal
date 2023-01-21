@@ -18,6 +18,7 @@ import {
     Webhook,
     Collection,
     ChannelType,
+    Invite,
 } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
@@ -216,7 +217,9 @@ type PortalMessageId = string;
 // Config
 const portalIntro = {
     portal: "**Welcome to the setup!** Select which Portal you want this channel to be connected to.",
-    confirm: `**Do you want to join this Portal?** You can always leave using \`${prefix}leave\`.`,
+    askInvite:
+        "**Do you want to share an invite link to your server** with the Portal? You can always remove it by re-joining the Portal.",
+    confirm: `**Do you want to join this Portal?** You can also choose to share an invite to this server with the Portal. You can always leave using \`${prefix}leave\`.`,
 };
 
 // Database
@@ -390,6 +393,17 @@ async function getWebhook({
         return webhook;
     } else return webhook;
 }
+async function deleteWebhook({
+    channel,
+    webhookId,
+}: {
+    channel: string | TextChannel;
+    webhookId?: string;
+}): Promise<Webhook> {
+    const webhook = await getWebhook({ channel, webhookId });
+    webhook.delete();
+    return webhook;
+}
 function checkPermissions(message: Message): boolean {
     if (!message.member?.permissions.has(PermissionFlagsBits.ManageChannels)) {
         message.reply(
@@ -398,6 +412,21 @@ function checkPermissions(message: Message): boolean {
         return false;
     }
     return true;
+}
+async function createInvite(channel: TextChannel): Promise<Invite | Error> {
+    try {
+        return await channel.createInvite({
+            temporary: false,
+            maxAge: 0,
+            maxUses: 0,
+            unique: true,
+            reason: "Portal invite",
+        });
+    } catch (error) {
+        console.log("Failed to create invite.");
+        console.error(error);
+        return Error("Failed to create invite.");
+    }
 }
 // Database helpers
 function createPortal({
@@ -514,9 +543,15 @@ async function createPortalConnection({
         webhookToken: webhook.token!,
     };
 }
-function deletePortalConnection(channelId: string): PortalConnection | null {
+async function deletePortalConnection(
+    channelId: string
+): Promise<PortalConnection | null> {
     const portalConnection = getPortalConnection(channelId);
     if (!portalConnection) return null;
+    // Delete webhook
+    await deleteWebhook({ channel: channelId });
+
+    // Delete portal connection
     db.prepare("DELETE FROM portalConnections WHERE channelId = ?").run(
         channelId
     );
@@ -736,25 +771,71 @@ client.on(Events.MessageCreate, async (message) => {
                 const portalConnections = getPortalConnections(
                     portalConnection.portalId
                 );
-                message.reply({
-                    content:
-                        "Connected to Portal `#" +
-                        portal.id +
-                        "` - " +
-                        portal.emoji +
-                        portal.name +
-                        (portal.nsfw ? "🔞" : "") +
-                        (portal.exclusive ? "🔒" : "") +
-                        (portal.password
-                            ? "\nPassword: ||" + portal.password + "||"
-                            : "") +
-                        ".\nConnection shared with\n" +
-                        portalConnections
-                            .map(
-                                (c) => `• **${c.guildName}** - ${c.channelName}`
-                            )
-                            .join("\n"),
-                });
+
+                for (const portalConnection of portalConnections.values()) {
+                    const channel = await client.channels.fetch(
+                        portalConnection.channelId
+                    );
+                    if (!channel || channel.type !== ChannelType.GuildText)
+                        continue;
+                    const webhook = await getWebhook({
+                        channel: channel,
+                        webhookId: portalConnection.webhookId,
+                    });
+
+                    const portalMessageId = getPortalMessageId(message.id);
+
+                    const replyId =
+                        portalConnection.channelId === message.channel.id
+                            ? message.id
+                            : portalMessageId
+                            ? getPortalMessages(portalMessageId).find(
+                                  (pm) =>
+                                      pm.linkedChannelId ===
+                                      portalConnection.channelId
+                              )?.linkedMessageId
+                            : undefined;
+
+                    webhook.send({
+                        content:
+                            `${
+                                replyId
+                                    ? `[[Reply to \`${
+                                          message.author.tag
+                                      }\` - \`${message.content.slice(
+                                          0,
+                                          40
+                                      )}\`]](https://discord.com/channels/${
+                                          channel.guildId
+                                      }/${channel.id}/${replyId})`
+                                    : `\`[Reply failed]\``
+                            }\nConnected to Portal \`#` +
+                            portal.id +
+                            "` - " +
+                            portal.emoji +
+                            portal.name +
+                            (portal.nsfw ? "🔞" : "") +
+                            (portal.exclusive ? "🔒" : "") +
+                            (portal.password
+                                ? "\nPassword: ||" + portal.password + "||"
+                                : "") +
+                            ".\nConnection shared with\n" +
+                            portalConnections
+                                .map(
+                                    (c) =>
+                                        `• **${
+                                            c.guildInvite
+                                                ? `[${c.guildName}](<https://discord.gg/${c.guildInvite}>)`
+                                                : c.guildName
+                                        }** - #${c.channelName}`
+                                )
+                                .join("\n"),
+                        avatarURL: message.client.user.avatarURL() || "",
+                        username: message.client.user.username,
+                    });
+                }
+
+                // message.reply();
                 break;
             }
             case "invite":
@@ -850,7 +931,7 @@ client.on(Events.MessageCreate, async (message) => {
                 // Check permissions
                 if (!checkPermissions(message)) break;
 
-                const portalConnection = deletePortalConnection(
+                const portalConnection = await deletePortalConnection(
                     message.channel.id
                 );
                 if (!portalConnection) {
@@ -1219,6 +1300,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
                                 {
                                     type: ComponentType.ActionRow,
                                     components: [
+                                        {
+                                            type: ComponentType.Button,
+                                            customId: "portalJoinInvite",
+                                            label: "Join Portal + share invite",
+                                            style: ButtonStyle.Success,
+                                        },
                                         {
                                             type: ComponentType.Button,
                                             customId: "portalJoin",
@@ -1599,7 +1686,54 @@ client.on(Events.InteractionCreate, async (interaction) => {
                         return;
                     }
                     interaction.update({
-                        content: `Joined \`#${portal.id}\` - ${portal.emoji}${portal.name}!`,
+                        content: `Joined \`#${portal.id}\` - ${portal.emoji}${
+                            portal.name
+                        }${portal.nsfw ? "🔞" : ""}${
+                            portal.exclusive ? "🔒" : ""
+                        }!`,
+                        components: [],
+                    });
+                    break;
+                }
+                case "portalJoinInvite": {
+                    // Get setup
+                    const setup = connectionSetups.get(interaction.user.id);
+                    if (!setup) return sendExpired(interaction);
+
+                    // Create invite
+                    const invite = await createInvite(interaction.channel);
+
+                    // Join portal
+                    const portalConnection = await createPortalConnection({
+                        portalId: setup.portalId,
+                        channelId: setup.channelId,
+                        guildInvite: invite instanceof Error ? "" : invite.code,
+                    });
+                    if (portalConnection instanceof Error) {
+                        interaction.reply({
+                            content:
+                                "A weird error ocurred. Apparently this channel doesn't exist!",
+                            ephemeral: true,
+                        });
+                        return;
+                    }
+                    const portal = getPortal(portalConnection.portalId);
+                    if (!portal) {
+                        interaction.reply({
+                            content:
+                                "A weird error ocurred. Apparently this portal doesn't exist!",
+                            ephemeral: true,
+                        });
+                        return;
+                    }
+                    interaction.update({
+                        content: `Joined \`#${portal.id}\` - ${portal.emoji}${
+                            portal.name
+                        }!${
+                            invite instanceof Error
+                                ? "\n**Error:** Failed to create invite. Do I have the `Create Invite` permission?"
+                                : `\nCreated invite: ${invite.url}`
+                        }`,
                         components: [],
                     });
                     break;
@@ -2019,6 +2153,12 @@ client.on(Events.InteractionCreate, async (interaction) => {
                             {
                                 type: ComponentType.ActionRow,
                                 components: [
+                                    {
+                                        type: ComponentType.Button,
+                                        customId: "portalJoinInvite",
+                                        label: "Join Portal + share invite",
+                                        style: ButtonStyle.Success,
+                                    },
                                     {
                                         type: ComponentType.Button,
                                         customId: "portalJoin",
