@@ -835,8 +835,7 @@ client.on(Events.MessageCreate, async (message) => {
                     if (!user) return `@Unknown`;
                     return `@${user.username}`;
                 })
-                .replace(/\n/g, " ") // Remove newlines
-                .replace(/`/g, "`"); // Escape backticks
+                .replace(/\n/g, " "); // Remove newlines
 
             const refAuthorTag = originalReference.author.tag
                 .split("@")[0]
