@@ -931,16 +931,15 @@ client.on(Events.MessageCreate, async (message) => {
                 return;
             }
             // Send webhook message
-            const webhookMessage = await webhook.send({
-                content: content,
+            // Send a separate message for each attachment to prevent uploading them all again
+            const attachments = message.attachments.toJSON();
+
+            const firstMessage = await webhook.send({
+                content: newContent.trim() ? newContent : attachments.shift()?.url,
                 username: `${message.author.tag} ${
                     message.guild?.name ? ` @ ${message.guild.name}` : ""
                 }`,
                 avatarURL: message.author.avatarURL() || undefined,
-                files: message.attachments.map((a) => ({
-                    attachment: a.url,
-                    name: a.name || undefined,
-                })),
                 embeds: embeds,
                 tts: message.tts,
                 allowedMentions: {
@@ -953,8 +952,30 @@ client.on(Events.MessageCreate, async (message) => {
                 portalId: portalConnection.portalId,
                 messageId: message.id,
                 linkedChannelId: portalConnection.channelId,
-                linkedMessageId: webhookMessage.id,
+                linkedMessageId: firstMessage.id,
             });
+            // Send remaining attachments
+            for (const attachment of attachments) {
+                const webhookMessage = await webhook.send({
+                    content: attachment.url,
+                    username: `${message.author.tag} ${
+                        message.guild?.name ? ` @ ${message.guild.name}` : ""
+                    }`,
+                    avatarURL: message.author.avatarURL() || undefined,
+                    tts: message.tts,
+                    allowedMentions: {
+                        parse: ["users"],
+                    },
+                });
+
+                createPortalMessage({
+                    id: portalMessageId,
+                    portalId: portalConnection.portalId,
+                    messageId: message.id,
+                    linkedChannelId: portalConnection.channelId,
+                    linkedMessageId: webhookMessage.id,
+                });
+            }
         });
     })();
 
