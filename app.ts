@@ -743,6 +743,198 @@ client.on(Events.MessageCreate, async (message) => {
     // Ignore if not TextChannel
     if (message.channel.type !== ChannelType.GuildText) return;
 
+    // Portal functionality
+    (async () => {
+        // why do I have to check this type again? ask typescript...
+        if (message.channel.type !== ChannelType.GuildText) return;
+
+        const portalConnection = getPortalConnection(message.channel.id);
+        if (!portalConnection) return;
+        const portalConnections = getPortalConnections(
+            portalConnection.portalId
+        );
+
+        // Send message to other channels
+        // -- Preprocess message --
+        // Replace image embeds with links
+        const embeds = message.embeds
+            .map((e) => {
+                if (!e.data.url) return e;
+                if (!message.content.includes(e.data.url))
+                    message.content += `\n${e.data.url}`;
+                return null;
+            })
+            .filter((e) => e !== null) as Embed[];
+
+        // Convert unknown emojis
+        const emojis = message.content.match(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g);
+        const replacement = emojis?.map((e) => {
+            const animated = e.startsWith("<a:");
+            // Match all numbers after :
+            const id = e.match(/:[0-9]+>/)?.[0].slice(1, -1);
+            if (!id) return e;
+            const emoji = client.emojis.cache.get(id);
+            if (emoji) return emoji.toString();
+            return `https://cdn.discordapp.com/emojis/${id}.${
+                animated ? "gif" : "webp"
+            }?size=48&quality=lossless\n`;
+        });
+        if (emojis && replacement) {
+            // Replace message content matches
+            for (let i = 0; i < emojis.length; i++) {
+                message.content = message.content.replace(
+                    emojis[i],
+                    replacement[i]
+                );
+            }
+        }
+        // Stickers
+        message.content += "\n" + message.stickers.map((s) => s.url).join("\n");
+        // Replies
+        const originalReference = message.reference?.messageId
+            ? await safeFetchMessage(
+                  message.channel,
+                  message.reference.messageId
+              )
+            : null;
+        let content = message.content;
+        const getLinked = async () => {
+            const failed = "`[Reply failed]`\n";
+
+            if (!originalReference) return failed;
+
+            // Remove first line if it starts with "`[Reply failed]`" or "[[Reply to `"
+            const refContent = (
+                originalReference.content.startsWith("`[Reply failed]`") ||
+                originalReference.content.startsWith("[[Reply to `")
+                    ? originalReference.content.split("\n").slice(1).join("\n")
+                    : originalReference.content
+            )
+                .replace(/<@!?([0-9]+)>/g, (_, id) => {
+                    // Replace <@id> with @username
+                    const user = client.users.cache.get(id);
+                    if (!user) return `@Unknown`;
+                    return `@${user.username}`;
+                })
+                .replace(/\n/g, " ") // Remove newlines
+                .replace(/`/g, "`"); // Escape backticks
+
+            const refAuthorTag = originalReference.author.tag
+                .split("@")[0]
+                .trim();
+            const refPreview =
+                refContent.length + refAuthorTag.length > 50
+                    ? refContent.substring(0, 50 - refAuthorTag.length) + "..."
+                    : refContent;
+
+            let referencePortalMessageId = originalReference.webhookId
+                ? getPortalMessageId(originalReference.id, true)
+                : getPortalMessageId(originalReference.id);
+
+            if (!referencePortalMessageId) {
+                // Try again after 0.5s
+                if (!portalMessageId) {
+                    // Wait 0.5 seconds and try again
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+                    referencePortalMessageId = originalReference.webhookId
+                        ? getPortalMessageId(originalReference.id, true)
+                        : getPortalMessageId(originalReference.id);
+                }
+            }
+
+            if (!referencePortalMessageId) return failed;
+            const linkedPortalMessages = getPortalMessages(
+                referencePortalMessageId
+            );
+
+            return { refAuthorTag, refPreview, linkedPortalMessages };
+        };
+        const reply = await getLinked();
+
+        const portalMessageId = generatePortalMessageId();
+
+        portalConnections.forEach(async (portalConnection) => {
+            // Don't send to same channel
+            if (portalConnection.channelId === message.channel.id) return;
+
+            // Get channel
+            const channel = (await client.channels.fetch(
+                portalConnection.channelId
+            )) as TextChannel | null;
+            if (!channel) {
+                // Remove connection if channel is not found
+                deletePortalConnection(portalConnection.channelId);
+                return;
+            }
+
+            // Add replies
+            if (originalReference) {
+                const buildReply = () => {
+                    if (typeof reply === "string") return reply;
+                    const { refAuthorTag, refPreview, linkedPortalMessages } =
+                        reply;
+
+                    const localReferenceId =
+                        linkedPortalMessages.find(
+                            (m) => m.linkedChannelId === channel.id
+                        )?.linkedMessageId ?? // If we can find a message in this channel, use that
+                        (originalReference.webhookId // Else, if the reply is to a webhook
+                            ? linkedPortalMessages.first()?.messageId // Use the messageId, since it means the source is in this channel (we are the source)
+                            : linkedPortalMessages.find(
+                                  (m) => m.linkedChannelId === channel.id
+                              )?.linkedMessageId); // If it's not a webhook, it must be a linkedMessage from this channel
+
+                    if (!localReferenceId) return "`[Reply failed]`\n";
+                    return (
+                        "[[Reply to `" +
+                        refAuthorTag +
+                        "` - `" +
+                        refPreview +
+                        "`]](https://discord.com/channels/" +
+                        channel.guildId +
+                        "/" +
+                        channel.id +
+                        "/" +
+                        localReferenceId +
+                        ")\n"
+                    );
+                };
+                content = buildReply() + message.content;
+            }
+
+            // Get webhook
+            const webhook = await getWebhook({
+                channel,
+                webhookId: portalConnection.webhookId,
+            });
+            // Send webhook message
+            const webhookMessage = await webhook.send({
+                content: content,
+                username: `${message.author.tag} ${
+                    message.guild?.name ? ` @ ${message.guild.name}` : ""
+                }`,
+                avatarURL: message.author.avatarURL() || undefined,
+                files: message.attachments.map((a) => ({
+                    attachment: a.url,
+                    name: a.name || undefined,
+                })),
+                embeds: embeds,
+                tts: message.tts,
+                allowedMentions: {
+                    parse: ["users"],
+                },
+            });
+
+            createPortalMessage({
+                id: portalMessageId,
+                portalId: portalConnection.portalId,
+                messageId: message.id,
+                linkedChannelId: portalConnection.channelId,
+                linkedMessageId: webhookMessage.id,
+            });
+        });
+    })();
+
     if (message.content.startsWith(prefix)) {
         const args = message.content.slice(prefix.length).trim().split(/ +/g);
         const command = args.shift()?.toLowerCase();
@@ -772,19 +964,25 @@ client.on(Events.MessageCreate, async (message) => {
                     portalConnection.portalId
                 );
 
-                for (const portalConnection of portalConnections.values()) {
+                portalConnections.forEach(async (portalConnection) => {
                     const channel = await client.channels.fetch(
                         portalConnection.channelId
                     );
                     if (!channel || channel.type !== ChannelType.GuildText)
-                        continue;
+                        return;
                     const webhook = await getWebhook({
                         channel: channel,
                         webhookId: portalConnection.webhookId,
                     });
 
-                    const portalMessageId = getPortalMessageId(message.id);
-
+                    let portalMessageId = getPortalMessageId(message.id);
+                    if (!portalMessageId) {
+                        // Wait 0.5 seconds and try again
+                        await new Promise((resolve) =>
+                            setTimeout(resolve, 500)
+                        );
+                        portalMessageId = getPortalMessageId(message.id);
+                    }
                     const replyId =
                         portalConnection.channelId === message.channel.id
                             ? message.id
@@ -796,18 +994,33 @@ client.on(Events.MessageCreate, async (message) => {
                               )?.linkedMessageId
                             : undefined;
 
+                    const replytext = replyId
+                        ? // Limit length of reply preview to 40 characters
+                          `[[Reply to \`${
+                              message.author.tag
+                          }\` - \`${message.content
+                              .replace("\n", " ")
+                              .trim()}\`]](https://discord.com/channels/${
+                              channel.guildId
+                          }/${channel.id}/${replyId})`
+                        : `\`[Reply failed]\``;
+
+                    console.log(replytext);
+
                     webhook.send({
                         content:
                             `${
                                 replyId
                                     ? `[[Reply to \`${
                                           message.author.tag
-                                      }\` - \`${message.content.slice(
-                                          0,
-                                          40
-                                      )}\`]](https://discord.com/channels/${
+                                      }\` - \`${message.content
+                                          .split("\n")[0]
+                                          .slice(
+                                              0,
+                                              40
+                                          )}\`]](<https://discord.com/channels/${
                                           channel.guildId
-                                      }/${channel.id}/${replyId})`
+                                      }/${channel.id}/${replyId}>)`
                                     : `\`[Reply failed]\``
                             }\nConnected to Portal \`#` +
                             portal.id +
@@ -833,9 +1046,7 @@ client.on(Events.MessageCreate, async (message) => {
                         avatarURL: message.client.user.avatarURL() || "",
                         username: message.client.user.username,
                     });
-                }
-
-                // message.reply();
+                });
                 break;
             }
             case "invite":
@@ -990,175 +1201,6 @@ client.on(Events.MessageCreate, async (message) => {
                 break;
             }
         }
-    }
-
-    // Portal functionality
-    const portalConnection = getPortalConnection(message.channel.id);
-    if (!portalConnection) return;
-    const portalConnections = getPortalConnections(portalConnection.portalId);
-
-    // Send message to other channels
-    // -- Preprocess message --
-    // Replace image embeds with links
-    const embeds = message.embeds
-        .map((e) => {
-            if (!e.data.url) return e;
-            if (!message.content.includes(e.data.url))
-                message.content += `\n${e.data.url}`;
-            return null;
-        })
-        .filter((e) => e !== null) as Embed[];
-
-    // Convert unknown emojis
-    const emojis = message.content.match(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g);
-    const replacement = emojis?.map((e) => {
-        const animated = e.startsWith("<a:");
-        // Match all numbers after :
-        const id = e.match(/:[0-9]+>/)?.[0].slice(1, -1);
-        if (!id) return e;
-        const emoji = client.emojis.cache.get(id);
-        if (emoji) return emoji.toString();
-        return `https://cdn.discordapp.com/emojis/${id}.${
-            animated ? "gif" : "webp"
-        }?size=48&quality=lossless\n`;
-    });
-    if (emojis && replacement) {
-        // Replace message content matches
-        for (let i = 0; i < emojis.length; i++) {
-            message.content = message.content.replace(
-                emojis[i],
-                replacement[i]
-            );
-        }
-    }
-    // Stickers
-    message.content += "\n" + message.stickers.map((s) => s.url).join("\n");
-    // Replies
-    const originalReference = message.reference?.messageId
-        ? await safeFetchMessage(message.channel, message.reference.messageId)
-        : null;
-    let content = message.content;
-    const getLinked = () => {
-        const failed = "`[Reply failed]`\n";
-
-        if (!originalReference) return failed;
-
-        // Remove first line if it starts with "`[Reply failed]`" or "[[Reply to `"
-        const refContent = (
-            originalReference.content.startsWith("`[Reply failed]`") ||
-            originalReference.content.startsWith("[[Reply to `")
-                ? originalReference.content.split("\n").slice(1).join("\n")
-                : originalReference.content
-        )
-            .replace(/<@!?([0-9]+)>/g, (_, id) => {
-                // Replace <@id> with @username
-                const user = client.users.cache.get(id);
-                if (!user) return `@Unknown`;
-                return `@${user.username}`;
-            })
-            .replace(/\n/g, " ") // Remove newlines
-            .replace(/`/g, "`"); // Escape backticks
-
-        const refAuthorTag = originalReference.author.tag.split("@")[0].trim();
-        const refPreview =
-            refContent.length + refAuthorTag.length > 50
-                ? refContent.substring(0, 50 - refAuthorTag.length) + "..."
-                : refContent;
-
-        const referencePortalMessageId = originalReference.webhookId
-            ? getPortalMessageId(originalReference.id, true)
-            : getPortalMessageId(originalReference.id);
-
-        if (!referencePortalMessageId) return failed;
-        const linkedPortalMessages = getPortalMessages(
-            referencePortalMessageId
-        );
-
-        return { refAuthorTag, refPreview, linkedPortalMessages };
-    };
-    const reply = getLinked();
-
-    const portalMessageId = generatePortalMessageId();
-
-    for (const [channelId, portalConnection] of portalConnections) {
-        // Don't send to same channel
-        if (portalConnection.channelId === message.channel.id) continue;
-
-        // Get channel
-        const channel = (await client.channels.fetch(
-            portalConnection.channelId
-        )) as TextChannel | null;
-        if (!channel) {
-            // Remove connection if channel is not found
-            deletePortalConnection(portalConnection.channelId);
-            continue;
-        }
-
-        // Add replies
-        if (originalReference) {
-            const buildReply = () => {
-                if (typeof reply === "string") return reply;
-                const { refAuthorTag, refPreview, linkedPortalMessages } =
-                    reply;
-
-                const localReferenceId =
-                    linkedPortalMessages.find(
-                        (m) => m.linkedChannelId === channel.id
-                    )?.linkedMessageId ?? // If we can find a message in this channel, use that
-                    (originalReference.webhookId // Else, if the reply is to a webhook
-                        ? linkedPortalMessages.first()?.messageId // Use the messageId, since it means the source is in this channel (we are the source)
-                        : linkedPortalMessages.find(
-                              (m) => m.linkedChannelId === channel.id
-                          )?.linkedMessageId); // If it's not a webhook, it must be a linkedMessage from this channel
-
-                if (!localReferenceId) return "`[Reply failed]`\n";
-                return (
-                    "[[Reply to `" +
-                    refAuthorTag +
-                    "` - `" +
-                    refPreview +
-                    "`]](https://discord.com/channels/" +
-                    channel.guildId +
-                    "/" +
-                    channel.id +
-                    "/" +
-                    localReferenceId +
-                    ")\n"
-                );
-            };
-            content = buildReply() + message.content;
-        }
-
-        // Get webhook
-        const webhook = await getWebhook({
-            channel,
-            webhookId: portalConnection.webhookId,
-        });
-        // Send webhook message
-        const webhookMessage = await webhook.send({
-            content: content,
-            username: `${message.author.tag} ${
-                message.guild?.name ? ` @ ${message.guild.name}` : ""
-            }`,
-            avatarURL: message.author.avatarURL() || undefined,
-            files: message.attachments.map((a) => ({
-                attachment: a.url,
-                name: a.name || undefined,
-            })),
-            embeds: embeds,
-            tts: message.tts,
-            allowedMentions: {
-                parse: ["users"],
-            },
-        });
-
-        createPortalMessage({
-            id: portalMessageId,
-            portalId: portalConnection.portalId,
-            messageId: message.id,
-            linkedChannelId: portalConnection.channelId,
-            linkedMessageId: webhookMessage.id,
-        });
     }
 });
 
