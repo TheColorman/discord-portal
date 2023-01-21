@@ -853,14 +853,11 @@ client.on(Events.MessageCreate, async (message) => {
                 : getPortalMessageId(originalReference.id);
 
             if (!referencePortalMessageId) {
-                // Try again after 0.5s
-                if (!portalMessageId) {
-                    // Wait 0.5 seconds and try again
-                    await new Promise((resolve) => setTimeout(resolve, 500));
-                    referencePortalMessageId = originalReference.webhookId
-                        ? getPortalMessageId(originalReference.id, true)
-                        : getPortalMessageId(originalReference.id);
-                }
+                // Try again after 1s
+                await new Promise((resolve) => setTimeout(resolve, 1000));
+                referencePortalMessageId = originalReference.webhookId
+                    ? getPortalMessageId(originalReference.id, true)
+                    : getPortalMessageId(originalReference.id);
             }
 
             if (!referencePortalMessageId) return failed;
@@ -1009,9 +1006,9 @@ client.on(Events.MessageCreate, async (message) => {
 
                     let portalMessageId = getPortalMessageId(message.id);
                     if (!portalMessageId) {
-                        // Wait 0.5 seconds and try again
+                        // Wait 1s and try again
                         await new Promise((resolve) =>
-                            setTimeout(resolve, 500)
+                            setTimeout(resolve, 1000)
                         );
                         portalMessageId = getPortalMessageId(message.id);
                     }
