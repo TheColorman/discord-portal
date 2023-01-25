@@ -1117,7 +1117,8 @@ client.on(Events.MessageCreate, async (message) => {
                                                 : c.guildName
                                         }** - #${c.channelName}`
                                 )
-                                .join("\n"),
+                                .join("\n") +
+                                "\n[Invite me](https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275415170113&scope=bot)",
                         avatarURL: message.client.user.avatarURL() || "",
                         username:
                             portalConnection.guildId === message.guildId
