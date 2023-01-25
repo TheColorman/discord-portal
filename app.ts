@@ -221,6 +221,12 @@ const portalIntro = {
         "**Do you want to share an invite link to your server** with the Portal? You can always remove it by re-joining the Portal.",
     confirm: `**Do you want to join this Portal?** You can also choose to share an invite to this server with the Portal. You can always leave using \`${prefix}leave\`.`,
 };
+const webhookAvatars = [
+    "https://cdn.discordapp.com/avatars/1066196719173386261/e9b57e69088a7f5eff063317335bcb0f.webp",
+    "https://cdn.discordapp.com/avatars/1057901464435044403/54ea7de9372438c6272614c510e4aa74.webp",
+    "https://i.imgur.com/AJDWIxq.png",
+    "https://i.imgur.com/UHEJ41P.png",
+];
 
 // Database
 const db = sqlite3("./db.sqlite");
@@ -389,8 +395,11 @@ async function safeFetchChannel(
 async function createWebhook(channel: TextChannel): Promise<Webhook> {
     const webhook = await channel.createWebhook({
         name: "Portal connection",
+        avatar: webhookAvatars[
+            Math.floor(Math.random() * webhookAvatars.length)
+        ],
         reason: "New Portal connection established",
-    }); //TODO: Add avatar
+    });
     return webhook;
 }
 async function getWebhook({
