@@ -10,7 +10,6 @@ import {
     User,
     TextChannel,
     Embed,
-    MessageReference,
     PermissionFlagsBits,
     Message,
     MessagePayload,
@@ -205,14 +204,15 @@ type PortalMessage = {
     id: string;
     portalId: string;
     messageId: string;
-    linkedChannelId: string;
-    linkedMessageId: string;
+    channelId: string;
+    messageType: MessageType;
 };
 type PortalId = string;
 type ChannelId = string;
 type MessageId = string;
 type UserId = string;
 type PortalMessageId = string;
+type MessageType = "original" | "linked" | "linkedAttachment";
 
 // Config
 const portalIntro = {
@@ -235,8 +235,8 @@ process.on("uncaughtException", (err) => {
 
 // Create tables
 console.log("Creating tables...");
-// Modify portalConnections by adding guildInvite
-// db.prepare(`ALTER TABLE portalConnections ADD COLUMN guildInvite TEXT DEFAULT ''`).run()
+// Run this once for previous installations
+// db.prepare(`DROP TABLE IF EXISTS portalMessages`).run();
 db.prepare(
     `CREATE TABLE IF NOT EXISTS portals (id TEXT PRIMARY KEY, name TEXT, emoji TEXT, customEmoji INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, private INTEGER DEFAULT 0, password TEXT)`
 ).run();
@@ -254,7 +254,14 @@ db.prepare(
 )`
 ).run();
 db.prepare(
-    `CREATE TABLE IF NOT EXISTS portalMessages (id TEXT, portalId TEXT, messageId TEXT, linkedChannelId TEXT, linkedMessageId TEXT, FOREIGN KEY(portalId) REFERENCES portals(id))`
+    `CREATE TABLE IF NOT EXISTS portalMessages (
+        id TEXT, 
+        portalId TEXT, 
+        messageId TEXT, 
+        channelId TEXT,
+        messageType TEXT,
+        FOREIGN KEY(portalId) REFERENCES portals(id)
+    )` // messageType is one of "original" | "linked" | "linkedAttachment"
 ).run();
 // Create default portal if none exists
 if (!db.prepare("SELECT COUNT(1) FROM portals").get()) {
@@ -322,7 +329,7 @@ async function editMessage(
     messageId: string,
     options: string | MessagePayload | WebhookEditMessageOptions
 ): Promise<Error | Message<boolean> | null> {
-    const portalConnection = await getPortalConnection(channel.id);
+    const portalConnection = getPortalConnection(channel.id);
     if (!portalConnection) return Error("No Portal connection found.");
 
     try {
@@ -670,25 +677,25 @@ function createPortalMessage({
     id,
     portalId,
     messageId,
-    linkedChannelId,
-    linkedMessageId,
+    channelId,
+    messageType,
 }: {
     id: PortalMessageId;
     portalId: PortalId;
     messageId: MessageId;
-    linkedChannelId: ChannelId;
-    linkedMessageId: MessageId;
+    channelId: ChannelId;
+    messageType: MessageType;
 }): PortalMessage {
     // Note: Make sure id is the same for all linked messages
     db.prepare(
-        "INSERT INTO portalMessages (id, portalId, messageId, linkedChannelId, linkedMessageId) VALUES (?, ?, ?, ?, ?)"
-    ).run([id, portalId, messageId, linkedChannelId, linkedMessageId]);
+        "INSERT INTO portalMessages (id, portalId, messageId, channelId, messageType) VALUES (?, ?, ?, ?, ?)"
+    ).run([id, portalId, messageId, channelId, messageType]);
     return {
         id,
-        portalId: portalId,
-        messageId: messageId,
-        linkedChannelId: linkedChannelId,
-        linkedMessageId: linkedMessageId,
+        portalId,
+        messageId,
+        channelId,
+        messageType,
     };
 }
 function deletePortalMessages(
@@ -707,24 +714,20 @@ function getPortalMessages(
         .all(id);
     return new Collection<MessageId, PortalMessage>(
         portalMessages.map((portalMessage) => [
-            portalMessage.linkedMessageId,
+            portalMessage.messageId,
             {
                 id: portalMessage.id,
                 portalId: portalMessage.portalId,
                 messageId: portalMessage.messageId,
-                linkedChannelId: portalMessage.linkedChannelId,
-                linkedMessageId: portalMessage.linkedMessageId,
+                channelId: portalMessage.channelId,
+                messageType: portalMessage.messageType,
             },
         ])
     );
 }
-function getPortalMessageId(
-    messageId: MessageId,
-    linkedMessage?: boolean
-): PortalMessageId | null {
-    const idType = linkedMessage ? "linkedMessageId" : "messageId";
+function getPortalMessageId(messageId: MessageId): PortalMessageId | null {
     const portalMessageId = db
-        .prepare("SELECT id FROM portalMessages WHERE " + idType + " = ?")
+        .prepare("SELECT id FROM portalMessages WHERE messageId = ?")
         .get(messageId)?.id;
     if (!portalMessageId) return null;
     return portalMessageId;
@@ -823,22 +826,33 @@ client.on(Events.MessageCreate, async (message) => {
             if (!originalReference) return failed;
 
             // Remove first line if it starts with "`[Reply failed]`" or "[[Reply to `"
-            const refContent = (                                    // check if content is a link to cdn.discordapp.com/attachments or media.discordapp.net/attachments
-                originalReference.content === "" || originalReference.content.trim().match(/https?:\/\/(cdn|media)\.discordapp\.com\/attachments/)
-                    ? "(Click to see attachment 🖾)"
-                    : originalReference.content.startsWith(
-                          "`[Reply failed]`"
-                      ) || originalReference.content.startsWith("[[Reply to `")
-                    ? originalReference.content.split("\n").slice(1).join("\n")
-                    : originalReference.content
-            )
-                .replace(/<@!?([0-9]+)>/g, (_, id) => {
-                    // Replace <@id> with @username
-                    const user = client.users.cache.get(id);
-                    if (!user) return `@Unknown`;
-                    return `@${user.username}`;
-                })
-                .replace(/\n/g, " "); // Remove newlines
+            const refContent =
+                // check if content is a link to cdn.discordapp.com/attachments or media.discordapp.net/attachments
+                (
+                    originalReference.content === "" ||
+                    originalReference.content
+                        .trim()
+                        .match(
+                            /https?:\/\/(cdn|media)\.discordapp\.com\/attachments/
+                        )
+                        ? "(Click to see attachment 🖾)"
+                        : originalReference.content.startsWith(
+                              "`[Reply failed]`"
+                          ) ||
+                          originalReference.content.startsWith("[[Reply to `")
+                        ? originalReference.content
+                              .split("\n")
+                              .slice(1)
+                              .join("\n")
+                        : originalReference.content
+                )
+                    .replace(/<@!?([0-9]+)>/g, (_, id) => {
+                        // Replace <@id> with @username
+                        const user = client.users.cache.get(id);
+                        if (!user) return `@Unknown`;
+                        return `@${user.username}`;
+                    })
+                    .replace(/\n/g, " "); // Remove newlines
 
             const refAuthorTag = originalReference.author.tag
                 .split("@")[0]
@@ -848,16 +862,16 @@ client.on(Events.MessageCreate, async (message) => {
                     ? refContent.substring(0, 50 - refAuthorTag.length) + "..."
                     : refContent;
 
-            let referencePortalMessageId = originalReference.webhookId
-                ? getPortalMessageId(originalReference.id, true)
-                : getPortalMessageId(originalReference.id);
+            let referencePortalMessageId = getPortalMessageId(
+                originalReference.id
+            );
 
             if (!referencePortalMessageId) {
                 // Try again after 1s
                 await new Promise((resolve) => setTimeout(resolve, 1000));
-                referencePortalMessageId = originalReference.webhookId
-                    ? getPortalMessageId(originalReference.id, true)
-                    : getPortalMessageId(originalReference.id);
+                referencePortalMessageId = getPortalMessageId(
+                    originalReference.id
+                );
             }
 
             if (!referencePortalMessageId) return failed;
@@ -871,7 +885,10 @@ client.on(Events.MessageCreate, async (message) => {
 
         const portalMessageId = generatePortalMessageId();
 
-        portalConnections.forEach(async (portalConnection) => {
+        // Send to other channels and add to database
+        // Use a promise so we can wait for them all to finish
+        // When all messages have been sent, add the original to the database
+        const sendPromises = portalConnections.map(async (portalConnection) => {
             // Don't send to same channel
             if (portalConnection.channelId === message.channel.id) return;
 
@@ -892,15 +909,12 @@ client.on(Events.MessageCreate, async (message) => {
                     const { refAuthorTag, refPreview, linkedPortalMessages } =
                         reply;
 
-                    const localReferenceId =
-                        linkedPortalMessages.find(
-                            (m) => m.linkedChannelId === channel.id
-                        )?.linkedMessageId ?? // If we can find a message in this channel, use that
-                        (originalReference.webhookId // Else, if the reply is to a webhook
-                            ? linkedPortalMessages.first()?.messageId // Use the messageId, since it means the source is in this channel (we are the source)
-                            : linkedPortalMessages.find(
-                                  (m) => m.linkedChannelId === channel.id
-                              )?.linkedMessageId); // If it's not a webhook, it must be a linkedMessage from this channel
+                    // Fetch the message id of the reply in the portalConnection channel
+                    const localReferenceId = linkedPortalMessages.find(
+                        (linkedPortalMessage) =>
+                            linkedPortalMessage.channelId ===
+                            portalConnection.channelId
+                    )?.messageId;
 
                     if (!localReferenceId) return "`[Reply failed]`\n";
                     return (
@@ -935,7 +949,9 @@ client.on(Events.MessageCreate, async (message) => {
             const attachments = message.attachments.toJSON();
 
             const firstMessage = await webhook.send({
-                content: newContent.trim() ? newContent : attachments.shift()?.url,
+                content: newContent.trim()
+                    ? newContent
+                    : attachments.shift()?.url,
                 username: `${message.author.tag} ${
                     message.guild?.name ? ` @ ${message.guild.name}` : ""
                 }`,
@@ -950,9 +966,9 @@ client.on(Events.MessageCreate, async (message) => {
             createPortalMessage({
                 id: portalMessageId,
                 portalId: portalConnection.portalId,
-                messageId: message.id,
-                linkedChannelId: portalConnection.channelId,
-                linkedMessageId: firstMessage.id,
+                messageId: firstMessage.id,
+                channelId: firstMessage.channel.id,
+                messageType: "linked",
             });
             // Send remaining attachments
             for (const attachment of attachments) {
@@ -971,11 +987,20 @@ client.on(Events.MessageCreate, async (message) => {
                 createPortalMessage({
                     id: portalMessageId,
                     portalId: portalConnection.portalId,
-                    messageId: message.id,
-                    linkedChannelId: portalConnection.channelId,
-                    linkedMessageId: webhookMessage.id,
+                    messageId: webhookMessage.id,
+                    channelId: webhookMessage.channel.id,
+                    messageType: "linkedAttachment",
                 });
             }
+        });
+        await Promise.all(sendPromises);
+        // Add original to database
+        createPortalMessage({
+            id: portalMessageId,
+            portalId: portalConnection.portalId,
+            messageId: message.id,
+            channelId: message.channel.id,
+            messageType: "original",
         });
     })();
 
@@ -1035,15 +1060,17 @@ client.on(Events.MessageCreate, async (message) => {
                         );
                         portalMessageId = getPortalMessageId(message.id);
                     }
+                    console.log(getPortalMessages(portalMessageId ?? "asd"));
+
                     const replyId =
                         portalConnection.channelId === message.channel.id
                             ? message.id
                             : portalMessageId
                             ? getPortalMessages(portalMessageId).find(
-                                  (pm) =>
-                                      pm.linkedChannelId ===
+                                  (linkedPortalMessage) =>
+                                      linkedPortalMessage.channelId ===
                                       portalConnection.channelId
-                              )?.linkedMessageId
+                              )?.messageId
                             : undefined;
 
                     webhook.send({
@@ -1260,19 +1287,16 @@ client.on(Events.MessageDelete, async (message) => {
     // Delete linked messages
     for (const [messageId, portalMessage] of portalMessages) {
         // Find channel and message objects
-        const channel = await safeFetchChannel(portalMessage.linkedChannelId);
+        const channel = await safeFetchChannel(portalMessage.channelId);
         if (!channel) continue;
         const message = await safeFetchMessage(
             channel,
-            portalMessage.linkedMessageId
+            portalMessage.messageId
         );
         if (!message) continue;
 
         // Attempt to delete message
-        const result = await deleteMessage(
-            channel,
-            portalMessage.linkedMessageId
-        );
+        const result = await deleteMessage(channel, portalMessage.messageId);
         // If result is an Error we couldn't delete the message
         if (result instanceof Error) {
             channel.send(
@@ -1288,7 +1312,7 @@ client.on(Events.MessageDelete, async (message) => {
 client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     // Ignore webhook edits
     if (newMessage.webhookId) return;
-
+    console.log(_oldMessage, newMessage);
     // Check if message is a portal message
     const portalMessageId = getPortalMessageId(newMessage.id);
     if (!portalMessageId) return;
@@ -1298,21 +1322,21 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     // Edit linked messages
     for (const [messageId, portalMessage] of portalMessages) {
         // Find channel and message objects
-        const channel = await safeFetchChannel(portalMessage.linkedChannelId);
+        const channel = await safeFetchChannel(portalMessage.messageId);
         if (!channel) continue;
         const message = await safeFetchMessage(
             channel,
-            portalMessage.linkedMessageId
+            portalMessage.messageId
         );
         if (!message) continue;
 
         // Attempt to edit message
-        await editMessage(channel, portalMessage.linkedMessageId, {
+        await editMessage(channel, portalMessage.messageId, {
             content: newMessage.content,
-            files: newMessage.attachments.map((a) => ({
-                attachment: a.url,
-                name: a.name || undefined,
-            })),
+            // files: newMessage.attachments.map((a) => ({
+            //     attachment: a.url,
+            //     name: a.name || undefined,
+            // })),
             embeds: newMessage.embeds,
             allowedMentions: {
                 parse: ["users"],
@@ -1341,7 +1365,7 @@ client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
     if (!portal) return;
     // Suspend portal if nsfw changed
     if (portal.nsfw !== newChannel.nsfw) {
-        // TODO: Not implemented
+        //TODO: Not implemented
     }
 });
 
