@@ -1331,7 +1331,7 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     // Edit linked messages
     for (const [messageId, portalMessage] of portalMessages) {
         // Find channel and message objects
-        const channel = await safeFetchChannel(portalMessage.messageId);
+        const channel = await safeFetchChannel(portalMessage.channelId);
         if (!channel) continue;
         const message = await safeFetchMessage(
             channel,
