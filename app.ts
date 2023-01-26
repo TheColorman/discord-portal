@@ -1069,7 +1069,6 @@ client.on(Events.MessageCreate, async (message) => {
                         );
                         portalMessageId = getPortalMessageId(message.id);
                     }
-                    console.log(getPortalMessages(portalMessageId ?? "asd"));
 
                     const replyId =
                         portalConnection.channelId === message.channel.id
@@ -1322,7 +1321,7 @@ client.on(Events.MessageDelete, async (message) => {
 client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     // Ignore webhook edits
     if (newMessage.webhookId) return;
-    console.log(_oldMessage, newMessage);
+
     // Check if message is a portal message
     const portalMessageId = getPortalMessageId(newMessage.id);
     if (!portalMessageId) return;
