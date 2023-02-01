@@ -1152,7 +1152,7 @@ client.on(Events.MessageCreate, async (message) => {
                 );
                 if (portalGuildConnections.size > 0) {
                     message.reply(
-                        "A server can currently only have one Portal connection. Please remove the current connection before setting up a new one."
+                        `A server can currently only have one Portal connection. Please remove the current connection before setting up a new one. (\`${prefix}leave\`)`
                     );
                     break;
                 }
