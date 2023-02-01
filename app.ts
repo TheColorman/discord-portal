@@ -658,11 +658,12 @@ function updatePortalConnection(
 ): PortalConnection | null {
     const portalConnection = getPortalConnection(channelId);
     if (!portalConnection) return null;
+
     // Update only the options in portalConnectionOptions that are not null
     const { guildName, channelName, guildInvite, webhookId, webhookToken } =
         portalConnectionOptions;
     db.prepare(
-        "UPDATE portalConnections SET guildName = ?, channelName = ?, webhookId = ?, webhookToken = ? WHERE channelId = ?"
+        "UPDATE portalConnections SET guildName = ?, channelName = ?, guildInvite = ?, webhookId = ?, webhookToken = ? WHERE channelId = ?"
     ).run([
         guildName ?? portalConnection.guildName,
         channelName ?? portalConnection.channelName,
