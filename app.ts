@@ -1279,6 +1279,36 @@ client.on(Events.MessageCreate, async (message) => {
                 );
                 break;
             }
+            case "dev": {
+                if (message.author.id !== "298842558610800650") break;
+
+                const subcommand = args.shift();
+                switch (subcommand) {
+                    case "clearWebhooks": {
+                        const oauthGuilds = await client.guilds.fetch();
+                        const progress = await message.channel.send(`Deleting webhooks... (${oauthGuilds.size} guilds)`)
+
+                        let webhookCount = 0;
+                        for (const oathGuild of oauthGuilds.values()) {
+                            const guild = await oathGuild.fetch();
+                            const webhooks = await guild.fetchWebhooks();
+
+                            for (const webhook of webhooks.values()) {
+                                if (webhook.applicationId !== client.user?.id) {
+                                    continue;
+                                }
+                                try {
+                                    await webhook.delete("Developer command: clearWebhooks");
+                                    webhookCount++;
+                                } catch (e) {
+                                    message.channel.send(`Failed to delete webhook \`${webhook.name}\` in guild \`${guild.name}\` (${guild.id})\n${e}`);
+                                }
+                            }
+                        }
+                        progress.edit(`Deleted ${webhookCount} webhooks.`);
+                    }
+                }
+            }
         }
     }
 });
