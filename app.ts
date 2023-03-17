@@ -18,6 +18,8 @@ import {
     Collection,
     ChannelType,
     Invite,
+    ReactionEmoji,
+    GuildEmoji,
 } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
@@ -460,6 +462,14 @@ async function createInvite(channel: TextChannel): Promise<Invite | Error> {
         console.log("Failed to create invite.");
         console.error(error);
         return Error("Failed to create invite.");
+    }
+}
+async function addReaction(message: Message, emoji: GuildEmoji | ReactionEmoji) {
+    try {
+        await message.react(emoji);
+    } catch (err) {
+        // We don't have access to the emoji
+        // console.error(err);
     }
 }
 // Database helpers
@@ -1406,6 +1416,34 @@ client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
     // Suspend portal if nsfw changed
     if (portal.nsfw !== newChannel.nsfw) {
         //TODO: Not implemented
+    }
+});
+
+// Reactions
+client.on(Events.MessageReactionAdd, async (reaction, user) => {
+    console.log("Reaction added");
+    // Check if message is a portal message
+    const portalMessageId = getPortalMessageId(reaction.message.id);
+    if (!portalMessageId) return;
+    const portalMessages = getPortalMessages(portalMessageId);
+    if (!portalMessages.size) return;
+
+    // Add reaction to linked messages if we have access to it
+    for (const [messageId, portalMessage] of portalMessages) {
+        // Ignore original message
+        if (messageId === reaction.message.id) continue;
+
+        // Find channel and message objects
+        const channel = await safeFetchChannel(portalMessage.channelId);
+        if (!channel) continue;
+        const message = await safeFetchMessage(
+            channel,
+            portalMessage.messageId
+        );
+        if (!message) continue;
+
+        // Attempt to add reaction
+        await addReaction(message, reaction.emoji); // TODO: 1. Check if we have access to the emoji. 2. Remove reaction if it disappears from the original message
     }
 });
 
