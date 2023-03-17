@@ -777,6 +777,7 @@ client.once(Events.ClientReady, (c) => {
     console.log(`Ready! Logged in as ${c.user?.tag}`);
 });
 
+// Receive messages
 client.on(Events.MessageCreate, async (message) => {
     // Ignore if webhook
     if (message.webhookId) return;
