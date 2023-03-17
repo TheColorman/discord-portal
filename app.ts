@@ -1423,12 +1423,13 @@ client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
 
 // Reactions
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
-    console.log("Reaction added");
     // Check if message is a portal message
     const portalMessageId = getPortalMessageId(reaction.message.id);
     if (!portalMessageId) return;
     const portalMessages = getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
+
+    console.log(`Reacting with ${reaction.emoji} to ${portalMessages.size} messages.`);
 
     // Add reaction to linked messages if we have access to it
     for (const [messageId, portalMessage] of portalMessages) {
