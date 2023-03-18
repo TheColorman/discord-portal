@@ -820,7 +820,7 @@ client.on(Events.MessageCreate, async (message) => {
                 });
                 break;
             }
-            case "Unban": {
+            case "unban": {
                 // Check if user is allowed to use this command
                 if (!ADMINS.includes(message.author.id)) break;
 
@@ -859,7 +859,7 @@ client.on(Events.MessageCreate, async (message) => {
                 });
                 break;
             }
-            case "Ban": {
+            case "ban": {
                 // Check if user is allowed to use this command
                 if (!ADMINS.includes(message.author.id)) break;
 
