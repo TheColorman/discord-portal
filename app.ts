@@ -58,7 +58,6 @@ process.on("exit", () => {
 // Prevent crashes
 process.on("uncaughtException", (err) => {
     console.log("Uncaught exception!");
-    console.trace();
     console.error(err);
 });
 
