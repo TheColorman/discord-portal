@@ -1,5 +1,5 @@
 // Types
-type Portal = {
+export type Portal = {
     id: string;
     name: string;
     emoji: string;
@@ -8,7 +8,7 @@ type Portal = {
     exclusive: boolean;
     password: string;
 };
-type PortalConnection = {
+export type PortalConnection = {
     portalId: string;
     guildId: string;
     guildName: string;
@@ -18,25 +18,32 @@ type PortalConnection = {
     webhookId: string;
     webhookToken: string;
 };
-type PortalConnectionOptions = {
+export type PortalConnectionOptions = {
     guildName?: string;
     channelName?: string;
     guildInvite?: string;
     webhookId?: string;
     webhookToken?: string;
 };
-type PortalMessage = {
+export type PortalMessage = {
     id: string;
     portalId: string;
     messageId: string;
     channelId: string;
     messageType: MessageType;
 };
-type PortalId = string;
-type ChannelId = string;
-type MessageId = string;
-type UserId = string;
-type PortalMessageId = string;
-type MessageType = "original" | "linked" | "linkedAttachment";
-
-export type { Portal, PortalConnection, PortalConnectionOptions, PortalMessage, PortalId, ChannelId, MessageId, UserId, PortalMessageId, MessageType };
+export type LimitedAccount = {
+    userId: string;
+    portalId: PortalId;
+    channelId: ChannelId;
+    reason: string;
+    banned: boolean;
+    bot: boolean;
+}
+export type PortalId = string;
+export type ChannelId = string;
+export type MessageId = string;
+export type UserId = string;
+export type PortalMessageId = string;
+export type MessageType = "original" | "linked" | "linkedAttachment";
+export type Permissions = BitFieldResolvable<S, N>[]

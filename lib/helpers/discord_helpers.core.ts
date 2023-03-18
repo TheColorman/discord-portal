@@ -1,6 +1,7 @@
 import {
     Client,
     GuildEmoji,
+    GuildMember,
     Invite,
     Message,
     MessagePayload,
@@ -12,7 +13,7 @@ import {
 } from "discord.js";
 import DatabaseHelpersCore from "./database_helpers.core";
 import { Database } from "better-sqlite3";
-import { PortalConnection } from "../types";
+import { PortalConnection, Permissions } from "../types";
 import { webhookAvatars } from "../const";
 
 export default class DiscordHelpersCore extends DatabaseHelpersCore {

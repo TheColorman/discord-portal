@@ -10,6 +10,8 @@ import {
     PortalId,
     PortalMessage,
     PortalMessageId,
+    UserId,
+    LimitedAccount,
 } from "../types";
 import { Collection } from "discord.js";
 
@@ -360,5 +362,142 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
             .get(messageId)?.id;
         if (!portalMessageId) return null;
         return portalMessageId;
+    }
+
+    /**
+     * Check if a user id is a limited account.
+     * @param userId Id of the user to check
+     * @returns Limited account status
+     */
+    public getLimitedAccounts(userId: UserId): LimitedAccount[] {
+        const limitedAccounts = this.db
+            .prepare("SELECT * FROM limitedAccounts WHERE id = ?")
+            .all(userId);
+        return limitedAccounts.map((limitedAccount) => ({
+            userId: limitedAccount.userId,
+            portalId: limitedAccount.portalId,
+            channelId: limitedAccount.channelId,
+            reason: limitedAccount.reason,
+            banned: Boolean(limitedAccount.banned),
+            bot: Boolean(limitedAccount.bot),
+        }));
+    }
+
+    /**
+     * Check if there is a limited account for a user id and portal id.
+     * @param param0 userId and portalId of the limited account to get
+     * @returns Limited account status
+     */
+    public getLimitedAccount({ userId, portalId }: { userId: UserId, portalId: PortalId }): LimitedAccount | null {
+        const limitedAccount = this.db
+            .prepare(
+                "SELECT * FROM limitedAccounts WHERE userId = ? AND portalId = ?"
+            )
+            .get(userId, portalId);
+        if (!limitedAccount) return null;
+        return {
+            userId: limitedAccount.userId,
+            portalId: limitedAccount.portalId,
+            channelId: limitedAccount.channelId,
+            reason: limitedAccount.reason,
+            banned: Boolean(limitedAccount.banned),
+            bot: Boolean(limitedAccount.bot),
+        };
+    }
+
+    /**
+     * Mark a user id as a limited account.
+     * @param userId Id of the user to mark
+     * @param options Options for the limited account
+     * @returns Limited account status
+     */
+    public setLimitedAccount(
+        userId: UserId,
+        options: {
+            portalId: PortalId;
+            channelId: ChannelId;
+            reason: string;
+            banned: boolean;
+            bot: boolean;
+        }
+    ): LimitedAccount {
+        this.db
+            .prepare(
+                "INSERT INTO limitedAccounts (userId, portalId, channelId, reason, banned, bot) VALUES (?, ?, ?, ?, ?, ?)"
+            )
+            .run([
+                userId,
+                options.portalId,
+                options.channelId,
+                options.reason,
+                Number(options.banned),
+                Number(options.bot),
+            ]);
+        return {
+            userId,
+            portalId: options.portalId,
+            channelId: options.channelId,
+            reason: options.reason,
+            banned: options.banned,
+            bot: options.bot,
+        };
+    }
+
+    /**
+     * Update a limited account.
+     * @param userId Id of the user to update
+     * @param options Options for the limited account
+     * @returns Limited account status
+     */
+    public updateLimitedAccount(
+        userId: UserId,
+        options: {
+            portalId: PortalId;
+            channelId: ChannelId;
+            reason: string;
+            banned: boolean;
+            bot: boolean;
+        }
+    ): LimitedAccount {
+        const limitedAccount = this.getLimitedAccount({ userId, portalId: options.portalId});
+        if (!limitedAccount) {
+            return this.setLimitedAccount(userId, options);
+        }
+        this.db
+            .prepare(
+                "UPDATE limitedAccounts SET reason = ?, banned = ?, channelId = ? WHERE userId = ? and portalId = ?"
+            )
+            .run([
+                options.reason,
+                Number(options.banned),
+                options.channelId,
+                userId,
+                options.portalId,
+            ]);
+        return {
+            userId,
+            portalId: options.portalId,
+            channelId: options.channelId,
+            reason: options.reason,
+            banned: options.banned,
+            bot: options.bot,
+        };
+    }
+
+    /**
+     * Delete a limited account.
+     * @param userId userId of the limited account to delete
+     * @param portalId portalId of the limited account to delete
+     * @returns Deleted limited account
+     */
+    public deleteLimitedAccount(userId: UserId, portalId: PortalId): LimitedAccount | null {
+        const limitedAccount = this.getLimitedAccount({ userId, portalId });
+        if (!limitedAccount) return null;
+        this.db
+            .prepare(
+                "DELETE FROM limitedAccounts WHERE userId = ? AND portalId = ?"
+            )
+            .run(userId, portalId);
+        return limitedAccount;
     }
 }

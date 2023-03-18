@@ -9,6 +9,11 @@ import {
     User,
     Embed,
     ChannelType,
+    PermissionFlagsBits,
+    ContextMenuCommandBuilder,
+    ApplicationCommandType,
+    Routes,
+    REST,
 } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
@@ -64,11 +69,13 @@ process.on("uncaughtException", (err) => {
 // Create tables
 console.log("Creating tables...");
 // Run this once for previous installations
-// db.prepare(`DROP TABLE IF EXISTS portalMessages`).run();
+// db.prepare(`DROP TABLE IF EXISTS limitedAccounts`).run();
 db.prepare(
+    // For Portals
     `CREATE TABLE IF NOT EXISTS portals (id TEXT PRIMARY KEY, name TEXT, emoji TEXT, customEmoji INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, private INTEGER DEFAULT 0, password TEXT)`
 ).run();
 db.prepare(
+    // For Portal connections. Each connection is a channel that is linked to a Portal
     `CREATE TABLE IF NOT EXISTS portalConnections (
     portalId TEXT, 
     guildId TEXT, 
@@ -82,6 +89,7 @@ db.prepare(
 )`
 ).run();
 db.prepare(
+    // For Portal messages. Each message is a message that is sent to a Portal. ID is shared by all linked messages.
     `CREATE TABLE IF NOT EXISTS portalMessages (
         id TEXT, 
         portalId TEXT, 
@@ -90,6 +98,18 @@ db.prepare(
         messageType TEXT,
         FOREIGN KEY(portalId) REFERENCES portals(id)
     )` // messageType is one of "original" | "linked" | "linkedAttachment"
+).run();
+db.prepare(
+    // For limited accounts. An account may be blocked if it is spamming.
+    `CREATE TABLE IF NOT EXISTS limitedAccounts (
+        userId TEXT,
+        portalId TEXT,
+        channelId TEXT,
+        reason TEXT,
+        banned INTEGER DEFAULT 0,
+        bot INTEGER DEFAULT 0,
+        FOREIGN KEY(portalId) REFERENCES portals(id)
+    )`
 ).run();
 // Create default portal if none exists
 if (!db.prepare("SELECT COUNT(1) FROM portals").get()) {
@@ -109,7 +129,6 @@ const client = new Client({
 
 // Helpers
 const helpers = new DiscordHelpersCore(client, db);
-
 
 // Keep track of setups
 const connectionSetups = new Map<
@@ -149,8 +168,35 @@ client.on(Events.MessageCreate, async (message) => {
         // why do I have to check this type again? ask typescript...
         if (message.channel.type !== ChannelType.GuildText) return;
 
-        const portalConnection = helpers.getPortalConnection(message.channel.id);
+        const portalConnection = helpers.getPortalConnection(
+            message.channel.id
+        );
         if (!portalConnection) return;
+
+        // Check for spam
+        const limitedAccount = helpers.getLimitedAccount({
+            userId: message.author.id,
+            portalId: portalConnection.portalId,
+        });
+        // We want to ignore the account if it is banned
+        // or if the channel is not this one
+        if (
+            limitedAccount &&
+            (limitedAccount.banned ||
+                limitedAccount.channelId !== message.channel.id)
+        ) {
+            // Remove send permissions from user
+            if (!message.member) return;
+            try {
+                message.channel.permissionOverwrites.create(message.member, {
+                    SendMessages: false,
+                });
+            } catch (err) {
+                console.error(err);
+            }
+            return;
+        }
+
         const portalConnections = helpers.getPortalConnections(
             portalConnection.portalId
         );
@@ -272,7 +318,9 @@ client.on(Events.MessageCreate, async (message) => {
             if (portalConnection.channelId === message.channel.id) return;
 
             // Get channel
-            const channel = await helpers.safeFetchChannel(portalConnection.channelId);
+            const channel = await helpers.safeFetchChannel(
+                portalConnection.channelId
+            );
             if (!channel) {
                 // Remove connection if channel is not found
                 helpers.deletePortalConnection(portalConnection.channelId);
@@ -418,7 +466,9 @@ client.on(Events.MessageCreate, async (message) => {
                     );
                     // If no channel was found, the channel doesn't exist and we should delete the connection
                     if (!channel) {
-                        helpers.deletePortalConnection(portalConnection.channelId);
+                        helpers.deletePortalConnection(
+                            portalConnection.channelId
+                        );
                         return;
                     }
                     const webhook = await helpers.getWebhook({
@@ -427,28 +477,36 @@ client.on(Events.MessageCreate, async (message) => {
                     });
                     // If no webhook was found, the channel doesn't exist and we should delete the connection
                     if (!webhook) {
-                        helpers.deletePortalConnection(portalConnection.channelId);
+                        helpers.deletePortalConnection(
+                            portalConnection.channelId
+                        );
                         return;
                     }
 
-                    let portalMessageId = helpers.getPortalMessageId(message.id);
+                    let portalMessageId = helpers.getPortalMessageId(
+                        message.id
+                    );
                     if (!portalMessageId) {
                         // Wait 1s and try again
                         await new Promise((resolve) =>
                             setTimeout(resolve, 1000)
                         );
-                        portalMessageId = helpers.getPortalMessageId(message.id);
+                        portalMessageId = helpers.getPortalMessageId(
+                            message.id
+                        );
                     }
 
                     const replyId =
                         portalConnection.channelId === message.channel.id
                             ? message.id
                             : portalMessageId
-                            ? helpers.getPortalMessages(portalMessageId).find(
-                                  (linkedPortalMessage) =>
-                                      linkedPortalMessage.channelId ===
-                                      portalConnection.channelId
-                              )?.messageId
+                            ? helpers
+                                  .getPortalMessages(portalMessageId)
+                                  .find(
+                                      (linkedPortalMessage) =>
+                                          linkedPortalMessage.channelId ===
+                                          portalConnection.channelId
+                                  )?.messageId
                             : undefined;
 
                     webhook.send({
@@ -487,7 +545,7 @@ client.on(Events.MessageCreate, async (message) => {
                                         }** - #${c.channelName}`
                                 )
                                 .join("\n") +
-                                "\n[Invite me](https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275415170113&scope=bot)",
+                            "\n[Invite me](https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275683605585&scope=bot)",
                         avatarURL: message.client.user.avatarURL() || "",
                         username:
                             portalConnection.guildId === message.guildId
@@ -500,7 +558,7 @@ client.on(Events.MessageCreate, async (message) => {
             case "invite":
             case "link": {
                 message.reply(
-                    "Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275415170113&scope=bot"
+                    "Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275683605585&scope=bot"
                 );
                 break;
             }
@@ -516,9 +574,8 @@ client.on(Events.MessageCreate, async (message) => {
                 // Check permissions
                 if (!helpers.checkPermissions(message)) break;
 
-                const portalGuildConnections = helpers.getGuildPortalConnections(
-                    message.guildId
-                );
+                const portalGuildConnections =
+                    helpers.getGuildPortalConnections(message.guildId);
                 if (portalGuildConnections.size > 0) {
                     message.reply(
                         `A server can currently only have one Portal connection. Please remove the current connection before setting up a new one. (\`${PREFIX}leave\`)`
@@ -652,10 +709,13 @@ client.on(Events.MessageCreate, async (message) => {
                 if (!ADMINS.includes(message.author.id)) break;
 
                 const subcommand = args.shift();
+                console.log(subcommand);
                 switch (subcommand) {
                     case "clearWebhooks": {
                         const oauthGuilds = await client.guilds.fetch();
-                        const progress = await message.channel.send(`Deleting webhooks... (${oauthGuilds.size} guilds)`)
+                        const progress = await message.channel.send(
+                            `Deleting webhooks... (${oauthGuilds.size} guilds)`
+                        );
 
                         let webhookCount = 0;
                         for (const oathGuild of oauthGuilds.values()) {
@@ -667,14 +727,69 @@ client.on(Events.MessageCreate, async (message) => {
                                     continue;
                                 }
                                 try {
-                                    await webhook.delete("Developer command: clearWebhooks");
+                                    await webhook.delete(
+                                        "Developer command: clearWebhooks"
+                                    );
                                     webhookCount++;
                                 } catch (e) {
-                                    message.channel.send(`Failed to delete webhook \`${webhook.name}\` in guild \`${guild.name}\` (${guild.id})\n${e}`);
+                                    message.channel.send(
+                                        `Failed to delete webhook \`${webhook.name}\` in guild \`${guild.name}\` (${guild.id})\n${e}`
+                                    );
                                 }
                             }
                         }
                         progress.edit(`Deleted ${webhookCount} webhooks.`);
+                        break;
+                    }
+                    case "registerCommands": {
+                        const commands = [
+                            new ContextMenuCommandBuilder()
+                                .setName("Limit to this channel")
+                                .setDMPermission(false)
+                                .setType(ApplicationCommandType.User),
+                            new ContextMenuCommandBuilder()
+                                .setName("Ban")
+                                .setDMPermission(false)
+                                .setType(ApplicationCommandType.User),
+                            new ContextMenuCommandBuilder()
+                                .setName("Unban")
+                                .setDMPermission(false)
+                                .setType(ApplicationCommandType.User),
+                        ];
+
+                        if (!client.user || !token) return;
+                        new REST({ version: "10" })
+                            .setToken(token)
+                            .put(Routes.applicationCommands(client.user.id), {
+                                body: commands.map((c) => c.toJSON()),
+                            });
+                        message.channel.send("Registered commands.");
+                        break;
+                    }
+                    case "execute": {
+                        // JS Execution
+                        // Find code block. Starts with ``` and ends with ```. Sometimes, a language is specified after the first three backticks.
+                        const code = message.content
+                            .split(/```\w*/g)
+                            .slice(1)
+                            .join("```")
+                            .split("```")[0];
+
+                        try {
+                            let result = eval(code);
+                            // Stringify if object
+                            if (typeof result === "object") {
+                                result = JSON.stringify(result, null, 2);
+                            }
+                            message.channel.send({
+                                content: "```js\n" + result + "\n```",
+                            });
+                        } catch (err) {
+                            message.channel.send({
+                                content: "```js\n" + err + "\n```",
+                            });
+                        }
+                        break;
                     }
                 }
             }
@@ -705,7 +820,10 @@ client.on(Events.MessageDelete, async (message) => {
         if (!message) continue;
 
         // Attempt to delete message
-        const result = await helpers.deleteMessage(channel, portalMessage.messageId);
+        const result = await helpers.deleteMessage(
+            channel,
+            portalMessage.messageId
+        );
         // If result is an Error we couldn't delete the message
         if (result instanceof Error) {
             channel.send(
@@ -789,7 +907,9 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     const portalMessages = helpers.getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
-    console.log(`Reacting with ${reaction.emoji} to ${portalMessages.size} messages.`);
+    console.log(
+        `Reacting with ${reaction.emoji} to ${portalMessages.size} messages.`
+    );
 
     // Add reaction to linked messages if we have access to it
     for (const [messageId, portalMessage] of portalMessages) {
@@ -812,7 +932,7 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
 });
 
 client.on(Events.InteractionCreate, async (interaction) => {
-    //TODO: Clean up this fucking mess. ANONYMOUS FUNCTIONS PLEASE
+    //TODO: Clean up this fucking mess.
     // Return if not a text channel
     if (
         !interaction.channel ||
@@ -1214,10 +1334,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     if (!setup) return helpers.sendExpired(interaction);
 
                     // Join portal
-                    const portalConnection = await helpers.createPortalConnection({
-                        portalId: setup.portalId,
-                        channelId: setup.channelId,
-                    });
+                    const portalConnection =
+                        await helpers.createPortalConnection({
+                            portalId: setup.portalId,
+                            channelId: setup.channelId,
+                        });
                     if (portalConnection instanceof Error) {
                         interaction.reply({
                             content:
@@ -1251,14 +1372,18 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     if (!setup) return helpers.sendExpired(interaction);
 
                     // Create invite
-                    const invite = await helpers.createInvite(interaction.channel);
+                    const invite = await helpers.createInvite(
+                        interaction.channel
+                    );
 
                     // Join portal
-                    const portalConnection = await helpers.createPortalConnection({
-                        portalId: setup.portalId,
-                        channelId: setup.channelId,
-                        guildInvite: invite instanceof Error ? "" : invite.code,
-                    });
+                    const portalConnection =
+                        await helpers.createPortalConnection({
+                            portalId: setup.portalId,
+                            channelId: setup.channelId,
+                            guildInvite:
+                                invite instanceof Error ? "" : invite.code,
+                        });
                     if (portalConnection instanceof Error) {
                         interaction.reply({
                             content:
@@ -1327,10 +1452,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     });
                     portalSetups.delete(interaction.user.id);
 
-                    const portalConnection = await helpers.createPortalConnection({
-                        portalId: portal.id,
-                        channelId: portalSetup.channelId,
-                    });
+                    const portalConnection =
+                        await helpers.createPortalConnection({
+                            portalId: portal.id,
+                            channelId: portalSetup.channelId,
+                        });
                     if (portalConnection instanceof Error) {
                         interaction.reply({
                             content:
@@ -1440,7 +1566,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
                             portalCreation.customEmoji = reaction.emoji.id
                                 ? true
                                 : false;
-                            portalCreation.portalId = helpers.generatePortalId();
+                            portalCreation.portalId =
+                                helpers.generatePortalId();
 
                             portalSetups.set(
                                 interaction.user.id,
@@ -1543,7 +1670,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
                         interaction.user.id
                     );
                     const setup = connectionSetups.get(interaction.user.id);
-                    if (!portalCreation) return helpers.sendExpired(interaction);
+                    if (!portalCreation)
+                        return helpers.sendExpired(interaction);
                     if (!setup) return helpers.sendExpired(interaction);
 
                     const password =
@@ -1725,6 +1853,108 @@ client.on(Events.InteractionCreate, async (interaction) => {
                             },
                         ],
                     });
+                }
+            }
+        }
+
+        // Context menus
+        if (interaction.isUserContextMenuCommand()) {
+            switch (interaction.commandName) {
+                case "Limit to this channel": {
+                    // Check if user is allowed to use this command
+                    if (!ADMINS.includes(interaction.user.id)) {
+                        interaction.reply({
+                            content: "You are not allowed to use this command.",
+                            ephemeral: true,
+                        });
+                        return;
+                    }
+
+                    const user = interaction.targetUser;
+                    const portalId = helpers.getPortalConnection(
+                        interaction.channel.id
+                    )?.portalId;
+                    if (!portalId) return;
+                    helpers.setLimitedAccount(user.id, {
+                        portalId,
+                        channelId: interaction.channel.id,
+                        banned: false,
+                        bot: user.bot,
+                        reason: "Manual limit",
+                    });
+                    interaction.reply({
+                        content: `${interaction.user} limited ${user.tag} in this channel. They can still send messages to the Portal, but only in this channel.`,
+                    });
+                    break;
+                }
+                case "Unban": {
+                    // Check if user is allowed to use this command
+                    if (!ADMINS.includes(interaction.user.id)) {
+                        interaction.reply({
+                            content: "You are not allowed to use this command.",
+                            ephemeral: true,
+                        });
+                        return;
+                    }
+
+                    const user = interaction.targetUser;
+                    const portalId = helpers.getPortalConnection(
+                        interaction.channel.id
+                    )?.portalId;
+                    if (!portalId) return;
+                    helpers.deleteLimitedAccount(user.id, portalId);
+
+                    // Remove permissions in all channels
+                    const portalConnections =
+                        helpers.getPortalConnections(portalId);
+                    for (const [
+                        channelId,
+                        portalConnection,
+                    ] of portalConnections) {
+                        const channel = await helpers.safeFetchChannel(
+                            channelId
+                        );
+                        if (!channel) continue;
+                        try {
+                            const member = await channel.guild.members.fetch(
+                                user
+                            );
+                            await channel.permissionOverwrites.delete(member);
+                        } catch (e) {
+                            console.error(e);
+                        }
+                    }
+                    interaction.reply({
+                        content: `${interaction.user} unbanned ${user.tag} in this channel.`,
+                    });
+                    break;
+                }
+                case "Ban": {
+                    // Check if user is allowed to use this command
+                    if (!ADMINS.includes(interaction.user.id)) {
+                        interaction.reply({
+                            content: "You are not allowed to use this command.",
+                            ephemeral: true,
+                        });
+                        return;
+                    }
+
+                    const user = interaction.targetUser;
+                    const portalId = helpers.getPortalConnection(
+                        interaction.channel.id
+                    )?.portalId;
+                    if (!portalId) return;
+                    helpers.setLimitedAccount(user.id, {
+                        portalId,
+                        channelId: interaction.channel.id,
+                        banned: true,
+                        bot: user.bot,
+                        reason: "Manual block",
+                    });
+                    interaction.reply({
+                        content: `${interaction.user} banned ${user.tag} in this channel.`,
+                    });
+                    break;
                 }
             }
         }
