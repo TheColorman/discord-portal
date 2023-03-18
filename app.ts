@@ -12,7 +12,7 @@ import {
 } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
-import { prefix } from "./config.json";
+import { PREFIX, ADMINS } from "./config.json";
 import DiscordHelpersCore from "./lib/helpers/discord_helpers.core";
 import { UserId } from "./lib/types";
 dotenv.config();
@@ -42,13 +42,12 @@ Error.prepareStackTrace = (err, stack) => {
 
 const token = process.env.TOKEN;
 
-
 // Config
 const portalIntro = {
     portal: "**Welcome to the setup!** Select which Portal you want this channel to be connected to.",
     askInvite:
         "**Do you want to share an invite link to your server** with the Portal? You can always remove it by re-joining the Portal.",
-    confirm: `**Do you want to join this Portal?** You can also choose to share an invite to this server with the Portal. You can always leave using \`${prefix}leave\`.`,
+    confirm: `**Do you want to join this Portal?** You can also choose to share an invite to this server with the Portal. You can always leave using \`${PREFIX}leave\`.`,
 };
 
 // Database
@@ -385,8 +384,8 @@ client.on(Events.MessageCreate, async (message) => {
         });
     })();
 
-    if (message.content.startsWith(prefix)) {
-        const args = message.content.slice(prefix.length).trim().split(/ +/g);
+    if (message.content.startsWith(PREFIX)) {
+        const args = message.content.slice(PREFIX.length).trim().split(/\s+/g);
         const command = args.shift()?.toLowerCase();
 
         switch (command) {
@@ -509,7 +508,7 @@ client.on(Events.MessageCreate, async (message) => {
             case "help":
             case "commands": {
                 message.reply(
-                    `\`${prefix}portal\` - Get information about the Portal connection of the current channel.\n\`${prefix}join\` - Join a Portal.\n\`${prefix}leave\` - Leave a Portal.\n\`${prefix}delete\` - Delete a Portal.\n\`${prefix}invite\` - Get an invite link for the bot.\n\`${prefix}help\` - Get a list of commands.`
+                    `\`${PREFIX}portal\` - Get information about the Portal connection of the current channel.\n\`${PREFIX}join\` - Join a Portal.\n\`${PREFIX}leave\` - Leave a Portal.\n\`${PREFIX}delete\` - Delete a Portal.\n\`${PREFIX}invite\` - Get an invite link for the bot.\n\`${PREFIX}help\` - Get a list of commands.`
                 );
                 break;
             }
@@ -523,7 +522,7 @@ client.on(Events.MessageCreate, async (message) => {
                 );
                 if (portalGuildConnections.size > 0) {
                     message.reply(
-                        `A server can currently only have one Portal connection. Please remove the current connection before setting up a new one. (\`${prefix}leave\`)`
+                        `A server can currently only have one Portal connection. Please remove the current connection before setting up a new one. (\`${PREFIX}leave\`)`
                     );
                     break;
                 }
@@ -651,7 +650,7 @@ client.on(Events.MessageCreate, async (message) => {
                 break;
             }
             case "dev": {
-                if (message.author.id !== "298842558610800650") break;
+                if (!ADMINS.includes(message.author.id)) break;
 
                 const subcommand = args.shift();
                 switch (subcommand) {
