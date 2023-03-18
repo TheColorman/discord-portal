@@ -129,3 +129,6 @@ dist
 .pnp.*
 db.sqlite
 app.js
+
+# TypeScript
+*.js

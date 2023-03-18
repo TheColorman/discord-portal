@@ -4,217 +4,44 @@ import {
     GatewayIntentBits,
     ComponentType,
     ButtonStyle,
-    Interaction,
     TextInputStyle,
     MessageReaction,
     User,
-    TextChannel,
     Embed,
-    PermissionFlagsBits,
-    Message,
-    MessagePayload,
-    WebhookEditMessageOptions,
-    Webhook,
-    Collection,
     ChannelType,
-    Invite,
-    ReactionEmoji,
-    GuildEmoji,
 } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
 import { prefix } from "./config.json";
+import DiscordHelpersCore from "./lib/helpers/discord_helpers.core";
+import { UserId } from "./lib/types";
 dotenv.config();
+
+Error.stackTraceLimit = Infinity; //! Remove in production
+Error.prepareStackTrace = (err, stack) => {
+    // Only keep the trace that is part of this file
+    const trace = stack.filter((call) => call.getFileName() === __filename);
+    return (
+        err.name +
+        ": " +
+        err.message +
+        " at " +
+        trace
+            .map(
+                (call) =>
+                    call.getFunctionName() +
+                    " (" +
+                    call.getFileName() +
+                    ":" +
+                    call.getLineNumber() +
+                    ")"
+            )
+            .join(" -> ")
+    );
+};
 
 const token = process.env.TOKEN;
 
-//? Hardcoded for dev purposes
-const nameSuggestions = {
-    beginning: [
-        "Cool",
-        "Hot",
-        "Steamy",
-        "Awesome",
-        "Dank",
-        "Dark",
-        "Deep",
-        "Shiny",
-        "Haunted",
-        "Intense",
-    ],
-    middle: [
-        "discussion",
-        "chill",
-        "grill",
-        "study",
-        "programming",
-        "gaming",
-        "text",
-        "bot",
-        "wrestling",
-    ],
-    end: [
-        "zone",
-        "place",
-        "room",
-        "space",
-        "world",
-        "realm",
-        "dimension",
-        "area",
-        "portal",
-        "hangout",
-    ],
-};
-const emojiSuggestions = [
-    "🌌",
-    "😂",
-    "👽",
-    "🎅",
-    "👑",
-    "🥋",
-    "🎮",
-    "🎲",
-    "🎨",
-    "🎬",
-    "🎤",
-    "🎸",
-    "🎹",
-    "🎻",
-    "🎺",
-    "🎼",
-    "🎵",
-    "🎶",
-    "🎧",
-    "🎙️",
-    "🎚️",
-    "🎛️",
-    "🎞️",
-    "📽️",
-    "📺",
-    "📷",
-    "📸",
-    "📹",
-    "📼",
-    "🔍",
-    "🔎",
-    "🔬",
-    "🔭",
-    "📡",
-    "🕯️",
-    "💡",
-    "🔦",
-    "🏮",
-    "📔",
-    "📕",
-    "📖",
-    "📗",
-    "📘",
-    "📙",
-    "📚",
-    "📓",
-    "📒",
-    "📃",
-    "📜",
-    "📄",
-    "📰",
-    "🗞️",
-    "📑",
-    "🔖",
-    "🏷️",
-    "💰",
-    "💴",
-    "💵",
-    "💶",
-    "💷",
-    "💸",
-    "💳",
-    "🧾",
-    "💹",
-    "💱",
-    "💲",
-    "✉️",
-    "📧",
-    "📨",
-    "📩",
-    "📤",
-    "📥",
-    "📦",
-    "📫",
-    "📪",
-    "📬",
-    "📭",
-    "📮",
-    "🗳️",
-    "✏️",
-    "✒️",
-    "🖋️",
-    "🖊️",
-    "🖌️",
-    "🖍️",
-    "📝",
-    "💼",
-    "📁",
-    "📂",
-    "🗂️",
-    "📅",
-    "📆",
-    "🗒️",
-    "🗓️",
-    "📇",
-    "📈",
-    "📉",
-    "📊",
-    "📋",
-    "📌",
-    "📍",
-    "📎",
-    "🖇️",
-    "📏",
-    "📐",
-];
-//? END
-
-// Types
-type Portal = {
-    id: string;
-    name: string;
-    emoji: string;
-    customEmoji: boolean;
-    nsfw: boolean;
-    exclusive: boolean;
-    password: string;
-};
-type PortalConnection = {
-    portalId: string;
-    guildId: string;
-    guildName: string;
-    channelId: string;
-    channelName: string;
-    guildInvite?: string;
-    webhookId: string;
-    webhookToken: string;
-};
-type PortalConnectionOptions = {
-    guildName?: string;
-    channelName?: string;
-    guildInvite?: string;
-    webhookId?: string;
-    webhookToken?: string;
-};
-type PortalMessage = {
-    id: string;
-    portalId: string;
-    messageId: string;
-    channelId: string;
-    messageType: MessageType;
-};
-type PortalId = string;
-type ChannelId = string;
-type MessageId = string;
-type UserId = string;
-type PortalMessageId = string;
-type MessageType = "original" | "linked" | "linkedAttachment";
 
 // Config
 const portalIntro = {
@@ -223,12 +50,6 @@ const portalIntro = {
         "**Do you want to share an invite link to your server** with the Portal? You can always remove it by re-joining the Portal.",
     confirm: `**Do you want to join this Portal?** You can also choose to share an invite to this server with the Portal. You can always leave using \`${prefix}leave\`.`,
 };
-const webhookAvatars = [
-    "https://cdn.discordapp.com/avatars/1066196719173386261/e9b57e69088a7f5eff063317335bcb0f.webp",
-    "https://cdn.discordapp.com/avatars/1057901464435044403/54ea7de9372438c6272614c510e4aa74.webp",
-    "https://i.imgur.com/AJDWIxq.png",
-    "https://i.imgur.com/UHEJ41P.png",
-];
 
 // Database
 const db = sqlite3("./db.sqlite");
@@ -289,470 +110,8 @@ const client = new Client({
 });
 
 // Helpers
-const sendExpired = (interaction: Interaction) => {
-    if (interaction.isRepliable())
-        interaction.reply({ content: "Expired.", ephemeral: true });
-};
-const generateName = (): string =>
-    `${
-        nameSuggestions.beginning[
-            Math.floor(Math.random() * nameSuggestions.beginning.length)
-        ]
-    } ${
-        nameSuggestions.middle[
-            Math.floor(Math.random() * nameSuggestions.middle.length)
-        ]
-    } ${
-        nameSuggestions.end[
-            Math.floor(Math.random() * nameSuggestions.end.length)
-        ]
-    }`;
-const generateEmoji = (): string =>
-    emojiSuggestions[Math.floor(Math.random() * emojiSuggestions.length)];
-const generatePortalId = (): PortalId => {
-    let id = Math.floor(Math.random() * 1000000).toString();
-    const portals = getPortals();
-    while (portals[id as keyof typeof portals])
-        id = Math.floor(Math.random() * 1000000).toString();
-    return id;
-};
-const generatePortalMessageId = (): PortalMessageId => {
-    const id = Math.floor(Math.random() * 1000000).toString();
-    const portalMessages = getPortalMessages(id);
-    if (portalMessages[id as keyof typeof portalMessages])
-        return generatePortalMessageId();
-    return id;
-};
-async function safeFetchMessage(
-    channel: TextChannel,
-    messageId: string
-): Promise<Message<true> | null> {
-    try {
-        return await channel.messages.fetch(messageId);
-    } catch (err) {
-        return null;
-    }
-}
-async function editMessage(
-    channel: TextChannel,
-    messageId: string,
-    options: string | MessagePayload | WebhookEditMessageOptions
-): Promise<Error | Message<boolean> | null> {
-    const portalConnection = getPortalConnection(channel.id);
-    if (!portalConnection) return Error("No Portal connection found.");
+const helpers = new DiscordHelpersCore(client, db);
 
-    try {
-        // Edit message using webhook
-        const webhook = await getWebhook({
-            channel,
-            webhookId: portalConnection.webhookId,
-        });
-        if (!webhook) return Error("No webhook found.");
-        return await webhook.editMessage(messageId, options);
-    } catch (err) {
-        console.log("Failed to edit message using webhook.");
-        console.error(err);
-        return null;
-    }
-}
-async function deleteMessage(
-    channel: TextChannel,
-    messageId: string
-): Promise<Error | Message<true> | null> {
-    // Fetch message
-    const message = await safeFetchMessage(channel, messageId);
-    if (!message) return null;
-    try {
-        // Attempt deletion using webhook
-        const portalConnection = getPortalConnection(channel.id);
-        const webhook = await getWebhook({
-            channel,
-            webhookId: portalConnection?.webhookId,
-        });
-        if (!webhook) throw Error("No webhook found.");
-        await webhook.deleteMessage(messageId);
-
-        return message;
-    } catch (err) {
-        // If webhook fails, attempt deletion using bot account
-        try {
-            await message.delete();
-            return message;
-        } catch (err) {
-            // We don't have permission to delete the message
-            return Error("No permission to delete message.");
-        }
-    }
-}
-async function safeFetchChannel(
-    channelId: string
-): Promise<TextChannel | null> {
-    try {
-        return (await client.channels.fetch(channelId)) as TextChannel;
-    } catch (err) {
-        console.log("Failed to fetch channel.");
-        // console.error(err);
-        return null;
-    }
-}
-async function createWebhook(channel: TextChannel): Promise<Webhook> {
-    const webhook = await channel.createWebhook({
-        name: "Portal connection",
-        avatar: webhookAvatars[
-            Math.floor(Math.random() * webhookAvatars.length)
-        ],
-        reason: "New Portal connection established",
-    });
-    return webhook;
-}
-async function getWebhook({
-    channel,
-    webhookId,
-}: {
-    channel: string | TextChannel;
-    webhookId?: string;
-}): Promise<Webhook | null> {
-    if (typeof channel === "string") {
-        const fetchedChannel = await safeFetchChannel(channel);
-        if (!fetchedChannel) return null;
-        channel = fetchedChannel;
-    }
-
-    if (!webhookId) return createWebhook(channel);
-    const webhook = (await channel.fetchWebhooks()).get(webhookId);
-    if (!webhook) {
-        const webhook = await createWebhook(channel);
-        updatePortalConnection(channel.id, {
-            webhookId: webhook.id,
-            webhookToken: webhook.token!,
-        });
-        return webhook;
-    } else return webhook;
-}
-async function deleteWebhook({
-    channel,
-    webhookId,
-}: {
-    channel: string | TextChannel;
-    webhookId?: string;
-}): Promise<Webhook | null> {
-    const webhook = await getWebhook({ channel, webhookId });
-    if (!webhook) return null;
-    webhook.delete();
-    return webhook;
-}
-function checkPermissions(message: Message): boolean {
-    if (!message.member?.permissions.has(PermissionFlagsBits.ManageChannels)) {
-        message.reply(
-            "You need the `Manage Channels` permission to use this command."
-        );
-        return false;
-    }
-    return true;
-}
-async function createInvite(channel: TextChannel): Promise<Invite | Error> {
-    try {
-        return await channel.createInvite({
-            temporary: false,
-            maxAge: 0,
-            maxUses: 0,
-            unique: true,
-            reason: "Portal invite",
-        });
-    } catch (error) {
-        console.log("Failed to create invite.");
-        console.error(error);
-        return Error("Failed to create invite.");
-    }
-}
-async function addReaction(message: Message, emoji: GuildEmoji | ReactionEmoji) {
-    try {
-        await message.react(emoji);
-    } catch (err) {
-        // We don't have access to the emoji
-        // console.error(err);
-    }
-}
-// Database helpers
-function createPortal({
-    name,
-    emoji,
-    customEmoji,
-    nsfw,
-    exclusive,
-    password,
-}: {
-    name: string;
-    emoji: string;
-    customEmoji: boolean;
-    nsfw: boolean;
-    exclusive: boolean;
-    password: string;
-}): Portal {
-    const portalId = generatePortalId();
-    db.prepare(
-        "INSERT INTO portals (id, name, emoji, customEmoji, nsfw, private, password) VALUES (?, ?, ?, ?, ?, ?, ?)"
-    ).run([
-        portalId,
-        name,
-        emoji,
-        Number(customEmoji),
-        Number(nsfw),
-        Number(exclusive),
-        password,
-    ]);
-    return {
-        id: portalId,
-        name,
-        emoji,
-        customEmoji,
-        nsfw,
-        exclusive,
-        password,
-    };
-}
-function deletePortal(portalId: string): Portal | null {
-    const portal = getPortal(portalId);
-    if (!portal) return null;
-    db.prepare("DELETE FROM portalConnections WHERE portalId = ?").run(
-        portalId
-    );
-    db.prepare("DELETE FROM portalMessages WHERE portalId = ?").run(portalId);
-    db.prepare("DELETE FROM portals WHERE id = ?").run(portalId);
-    return portal;
-}
-function getPortal(portalId: string): Portal | null {
-    const portal = db
-        .prepare("SELECT * FROM portals WHERE id = ?")
-        .get(portalId);
-    if (!portal) return null;
-    return {
-        id: portal.id,
-        name: portal.name,
-        emoji: portal.emoji,
-        customEmoji: Boolean(portal.customEmoji),
-        nsfw: Boolean(portal.nsfw),
-        exclusive: Boolean(portal.private),
-        password: portal.password,
-    };
-}
-function getPortals(): Collection<PortalId, Portal> {
-    const portals = db.prepare("SELECT * FROM portals").all();
-    return new Collection<PortalId, Portal>(
-        portals.map((portal) => [
-            portal.id,
-            {
-                id: portal.id,
-                name: portal.name,
-                emoji: portal.emoji,
-                customEmoji: Boolean(portal.customEmoji),
-                nsfw: Boolean(portal.nsfw),
-                exclusive: Boolean(portal.private),
-                password: portal.password,
-            },
-        ])
-    );
-}
-async function createPortalConnection({
-    portalId,
-    channelId,
-    guildInvite,
-}: {
-    portalId: string;
-    channelId: string;
-    guildInvite?: string;
-}): Promise<PortalConnection | Error> {
-    const channel = await safeFetchChannel(channelId);
-    if (!channel) return Error("Channel not found.");
-    const webhook = await getWebhook({ channel });
-    if (!webhook) return Error("Failed to create webhook.");
-    db.prepare(
-        "INSERT INTO portalConnections (portalId, guildId, guildName, channelId, channelName, guildInvite, webhookId, webhookToken) VALUES (?, ?, ?, ?, ?, ?, ?, ?)"
-    ).run([
-        portalId,
-        channel.guildId,
-        channel.guild.name,
-        channelId,
-        channel.name,
-        guildInvite || "",
-        webhook.id,
-        webhook.token,
-    ]);
-    return {
-        portalId,
-        guildId: channel.guildId,
-        guildName: channel.guild.name,
-        channelId,
-        channelName: channel.name,
-        guildInvite: guildInvite || "",
-        webhookId: webhook.id,
-        webhookToken: webhook.token!,
-    };
-}
-async function deletePortalConnection(
-    channelId: string
-): Promise<PortalConnection | null> {
-    const portalConnection = getPortalConnection(channelId);
-    if (!portalConnection) return null;
-    // Delete webhook
-    await deleteWebhook({ channel: channelId });
-
-    // Delete portal connection
-    db.prepare("DELETE FROM portalConnections WHERE channelId = ?").run(
-        channelId
-    );
-    return portalConnection;
-}
-function getGuildPortalConnections(
-    guildId: string
-): Collection<ChannelId, PortalConnection> {
-    const portalConnections = db
-        .prepare("SELECT * FROM portalConnections WHERE guildId = ?")
-        .all(guildId);
-    return new Collection<ChannelId, PortalConnection>(
-        portalConnections.map((portalConnection) => [
-            portalConnection.channelId,
-            {
-                portalId: portalConnection.portalId,
-                guildId: portalConnection.guildId,
-                guildName: portalConnection.guildName,
-                channelId: portalConnection.channelId,
-                channelName: portalConnection.channelName,
-                guildInvite: portalConnection.guildInvite,
-                webhookId: portalConnection.webhookId,
-                webhookToken: portalConnection.webhookToken,
-            },
-        ])
-    );
-}
-function getPortalConnection(channelId: string): PortalConnection | null {
-    const portalConnection = db
-        .prepare("SELECT * FROM portalConnections WHERE channelId = ?")
-        .get(channelId);
-    if (!portalConnection) return null;
-    return {
-        portalId: portalConnection.portalId,
-        guildId: portalConnection.guildId,
-        guildName: portalConnection.guildName,
-        channelId: portalConnection.channelId,
-        channelName: portalConnection.channelName,
-        guildInvite: portalConnection.guildInvite,
-        webhookId: portalConnection.webhookId,
-        webhookToken: portalConnection.webhookToken,
-    };
-}
-function getPortalConnections(
-    portalId: string
-): Collection<ChannelId, PortalConnection> {
-    const portalConnections = db
-        .prepare("SELECT * FROM portalConnections WHERE portalId = ?")
-        .all(portalId);
-    return new Collection<ChannelId, PortalConnection>(
-        portalConnections.map((portalConnection) => [
-            portalConnection.channelId,
-            {
-                portalId: portalConnection.portalId,
-                guildId: portalConnection.guildId,
-                guildName: portalConnection.guildName,
-                channelId: portalConnection.channelId,
-                channelName: portalConnection.channelName,
-                guildInvite: portalConnection.guildInvite,
-                webhookId: portalConnection.webhookId,
-                webhookToken: portalConnection.webhookToken,
-            },
-        ])
-    );
-}
-function updatePortalConnection(
-    channelId: string,
-    portalConnectionOptions: PortalConnectionOptions
-): PortalConnection | null {
-    const portalConnection = getPortalConnection(channelId);
-    if (!portalConnection) return null;
-
-    // Update only the options in portalConnectionOptions that are not null
-    const { guildName, channelName, guildInvite, webhookId, webhookToken } =
-        portalConnectionOptions;
-    db.prepare(
-        "UPDATE portalConnections SET guildName = ?, channelName = ?, guildInvite = ?, webhookId = ?, webhookToken = ? WHERE channelId = ?"
-    ).run([
-        guildName ?? portalConnection.guildName,
-        channelName ?? portalConnection.channelName,
-        guildInvite ?? portalConnection.guildInvite,
-        webhookId ?? portalConnection.webhookId,
-        webhookToken ?? portalConnection.webhookToken,
-        channelId,
-    ]);
-    return {
-        portalId: portalConnection.portalId,
-        guildId: portalConnection.guildId,
-        guildName: guildName ?? portalConnection.guildName,
-        channelId: portalConnection.channelId,
-        channelName: channelName ?? portalConnection.channelName,
-        guildInvite: guildInvite ?? portalConnection.guildInvite,
-        webhookId: webhookId ?? portalConnection.webhookId,
-        webhookToken: webhookToken ?? portalConnection.webhookToken,
-    };
-}
-function createPortalMessage({
-    id,
-    portalId,
-    messageId,
-    channelId,
-    messageType,
-}: {
-    id: PortalMessageId;
-    portalId: PortalId;
-    messageId: MessageId;
-    channelId: ChannelId;
-    messageType: MessageType;
-}): PortalMessage {
-    // Note: Make sure id is the same for all linked messages
-    db.prepare(
-        "INSERT INTO portalMessages (id, portalId, messageId, channelId, messageType) VALUES (?, ?, ?, ?, ?)"
-    ).run([id, portalId, messageId, channelId, messageType]);
-    return {
-        id,
-        portalId,
-        messageId,
-        channelId,
-        messageType,
-    };
-}
-function deletePortalMessages(
-    id: PortalMessageId
-): Map<MessageId, PortalMessage> | null {
-    const portalMessages = getPortalMessages(id);
-    if (!portalMessages.size) return null;
-    db.prepare("DELETE FROM portalMessages WHERE id = ?").run(id);
-    return portalMessages;
-}
-function getPortalMessages(
-    id: PortalMessageId
-): Collection<MessageId, PortalMessage> {
-    const portalMessages = db
-        .prepare("SELECT * FROM portalMessages WHERE id = ?")
-        .all(id);
-    return new Collection<MessageId, PortalMessage>(
-        portalMessages.map((portalMessage) => [
-            portalMessage.messageId,
-            {
-                id: portalMessage.id,
-                portalId: portalMessage.portalId,
-                messageId: portalMessage.messageId,
-                channelId: portalMessage.channelId,
-                messageType: portalMessage.messageType,
-            },
-        ])
-    );
-}
-function getPortalMessageId(messageId: MessageId): PortalMessageId | null {
-    const portalMessageId = db
-        .prepare("SELECT id FROM portalMessages WHERE messageId = ?")
-        .get(messageId)?.id;
-    if (!portalMessageId) return null;
-    return portalMessageId;
-}
 
 // Keep track of setups
 const connectionSetups = new Map<
@@ -792,9 +151,9 @@ client.on(Events.MessageCreate, async (message) => {
         // why do I have to check this type again? ask typescript...
         if (message.channel.type !== ChannelType.GuildText) return;
 
-        const portalConnection = getPortalConnection(message.channel.id);
+        const portalConnection = helpers.getPortalConnection(message.channel.id);
         if (!portalConnection) return;
-        const portalConnections = getPortalConnections(
+        const portalConnections = helpers.getPortalConnections(
             portalConnection.portalId
         );
 
@@ -836,7 +195,7 @@ client.on(Events.MessageCreate, async (message) => {
         message.content += "\n" + message.stickers.map((s) => s.url).join("\n");
         // Replies
         const originalReference = message.reference?.messageId
-            ? await safeFetchMessage(
+            ? await helpers.safeFetchMessage(
                   message.channel,
                   message.reference.messageId
               )
@@ -884,20 +243,20 @@ client.on(Events.MessageCreate, async (message) => {
                     ? refContent.substring(0, 50 - refAuthorTag.length) + "..."
                     : refContent;
 
-            let referencePortalMessageId = getPortalMessageId(
+            let referencePortalMessageId = helpers.getPortalMessageId(
                 originalReference.id
             );
 
             if (!referencePortalMessageId) {
                 // Try again after 1s
                 await new Promise((resolve) => setTimeout(resolve, 1000));
-                referencePortalMessageId = getPortalMessageId(
+                referencePortalMessageId = helpers.getPortalMessageId(
                     originalReference.id
                 );
             }
 
             if (!referencePortalMessageId) return failed;
-            const linkedPortalMessages = getPortalMessages(
+            const linkedPortalMessages = helpers.getPortalMessages(
                 referencePortalMessageId
             );
 
@@ -905,7 +264,7 @@ client.on(Events.MessageCreate, async (message) => {
         };
         const reply = await getLinked();
 
-        const portalMessageId = generatePortalMessageId();
+        const portalMessageId = helpers.generatePortalMessageId();
 
         // Send to other channels and add to database
         // Use a promise so we can wait for them all to finish
@@ -915,10 +274,10 @@ client.on(Events.MessageCreate, async (message) => {
             if (portalConnection.channelId === message.channel.id) return;
 
             // Get channel
-            const channel = await safeFetchChannel(portalConnection.channelId);
+            const channel = await helpers.safeFetchChannel(portalConnection.channelId);
             if (!channel) {
                 // Remove connection if channel is not found
-                deletePortalConnection(portalConnection.channelId);
+                helpers.deletePortalConnection(portalConnection.channelId);
                 return;
             }
 
@@ -957,13 +316,13 @@ client.on(Events.MessageCreate, async (message) => {
             }
 
             // Get webhook
-            const webhook = await getWebhook({
+            const webhook = await helpers.getWebhook({
                 channel,
                 webhookId: portalConnection.webhookId,
             });
             // If no webhook was found, the channel doesn't exist and we should delete the connection
             if (!webhook) {
-                deletePortalConnection(portalConnection.channelId);
+                helpers.deletePortalConnection(portalConnection.channelId);
                 return;
             }
             // Send webhook message
@@ -985,7 +344,7 @@ client.on(Events.MessageCreate, async (message) => {
                 },
             });
 
-            createPortalMessage({
+            helpers.createPortalMessage({
                 id: portalMessageId,
                 portalId: portalConnection.portalId,
                 messageId: firstMessage.id,
@@ -1006,7 +365,7 @@ client.on(Events.MessageCreate, async (message) => {
                     },
                 });
 
-                createPortalMessage({
+                helpers.createPortalMessage({
                     id: portalMessageId,
                     portalId: portalConnection.portalId,
                     messageId: webhookMessage.id,
@@ -1017,7 +376,7 @@ client.on(Events.MessageCreate, async (message) => {
         });
         await Promise.all(sendPromises);
         // Add original to database
-        createPortalMessage({
+        helpers.createPortalMessage({
             id: portalMessageId,
             portalId: portalConnection.portalId,
             messageId: message.id,
@@ -1033,7 +392,7 @@ client.on(Events.MessageCreate, async (message) => {
         switch (command) {
             case "portal":
             case "portals": {
-                const portalConnection = getPortalConnection(
+                const portalConnection = helpers.getPortalConnection(
                     message.channel.id
                 );
                 if (!portalConnection) {
@@ -1043,7 +402,7 @@ client.on(Events.MessageCreate, async (message) => {
                     });
                     break;
                 }
-                const portal = getPortal(portalConnection.portalId);
+                const portal = helpers.getPortal(portalConnection.portalId);
                 if (!portal) {
                     message.reply({
                         content:
@@ -1051,43 +410,43 @@ client.on(Events.MessageCreate, async (message) => {
                     });
                     break;
                 }
-                const portalConnections = getPortalConnections(
+                const portalConnections = helpers.getPortalConnections(
                     portalConnection.portalId
                 );
 
                 portalConnections.forEach(async (portalConnection) => {
-                    const channel = await safeFetchChannel(
+                    const channel = await helpers.safeFetchChannel(
                         portalConnection.channelId
                     );
                     // If no channel was found, the channel doesn't exist and we should delete the connection
                     if (!channel) {
-                        deletePortalConnection(portalConnection.channelId);
+                        helpers.deletePortalConnection(portalConnection.channelId);
                         return;
                     }
-                    const webhook = await getWebhook({
+                    const webhook = await helpers.getWebhook({
                         channel: channel,
                         webhookId: portalConnection.webhookId,
                     });
                     // If no webhook was found, the channel doesn't exist and we should delete the connection
                     if (!webhook) {
-                        deletePortalConnection(portalConnection.channelId);
+                        helpers.deletePortalConnection(portalConnection.channelId);
                         return;
                     }
 
-                    let portalMessageId = getPortalMessageId(message.id);
+                    let portalMessageId = helpers.getPortalMessageId(message.id);
                     if (!portalMessageId) {
                         // Wait 1s and try again
                         await new Promise((resolve) =>
                             setTimeout(resolve, 1000)
                         );
-                        portalMessageId = getPortalMessageId(message.id);
+                        portalMessageId = helpers.getPortalMessageId(message.id);
                     }
 
                     const replyId =
                         portalConnection.channelId === message.channel.id
                             ? message.id
                             : portalMessageId
-                            ? getPortalMessages(portalMessageId).find(
+                            ? helpers.getPortalMessages(portalMessageId).find(
                                   (linkedPortalMessage) =>
                                       linkedPortalMessage.channelId ===
                                       portalConnection.channelId
@@ -1157,9 +516,9 @@ client.on(Events.MessageCreate, async (message) => {
             case "setup":
             case "join": {
                 // Check permissions
-                if (!checkPermissions(message)) break;
+                if (!helpers.checkPermissions(message)) break;
 
-                const portalGuildConnections = getGuildPortalConnections(
+                const portalGuildConnections = helpers.getGuildPortalConnections(
                     message.guildId
                 );
                 if (portalGuildConnections.size > 0) {
@@ -1184,7 +543,7 @@ client.on(Events.MessageCreate, async (message) => {
                 }, 60000);
 
                 // Send message
-                const portals = getPortals();
+                const portals = helpers.getPortals();
                 message.reply({
                     content: `__Selected channel:__ <#${message.channel.id}>.\n${portalIntro.portal}.`,
                     components: [
@@ -1231,9 +590,9 @@ client.on(Events.MessageCreate, async (message) => {
             }
             case "leave": {
                 // Check permissions
-                if (!checkPermissions(message)) break;
+                if (!helpers.checkPermissions(message)) break;
 
-                const portalConnection = await deletePortalConnection(
+                const portalConnection = await helpers.deletePortalConnection(
                     message.channel.id
                 );
                 if (!portalConnection) {
@@ -1243,7 +602,7 @@ client.on(Events.MessageCreate, async (message) => {
                     });
                     break;
                 }
-                const portal = getPortal(portalConnection.portalId);
+                const portal = helpers.getPortal(portalConnection.portalId);
                 if (!portal) {
                     message.reply({
                         content:
@@ -1258,9 +617,9 @@ client.on(Events.MessageCreate, async (message) => {
             }
             case "delete": {
                 // Check permissions
-                if (!checkPermissions(message)) break;
+                if (!helpers.checkPermissions(message)) break;
 
-                const portalConnection = getPortalConnection(
+                const portalConnection = helpers.getPortalConnection(
                     message.channel.id
                 );
                 if (!portalConnection) {
@@ -1271,8 +630,8 @@ client.on(Events.MessageCreate, async (message) => {
                     break;
                 }
 
-                const portals = getPortals();
-                const portalConnections = getPortalConnections(
+                const portals = helpers.getPortals();
+                const portalConnections = helpers.getPortalConnections(
                     portalConnection.portalId
                 );
                 if (portalConnections.size > 1) {
@@ -1285,7 +644,7 @@ client.on(Events.MessageCreate, async (message) => {
                     message.reply("Cannot delete last Portal.");
                     break;
                 }
-                const portal = deletePortal(portalConnection.portalId);
+                const portal = helpers.deletePortal(portalConnection.portalId);
                 message.reply(
                     `Deleted Portal \`#${portalConnection.portalId}\` - ${portal?.emoji}${portal?.name}.`
                 );
@@ -1331,24 +690,24 @@ client.on(Events.MessageDelete, async (message) => {
     if (message.webhookId) return;
 
     // Check if message is a portal message
-    const portalMessageId = getPortalMessageId(message.id);
+    const portalMessageId = helpers.getPortalMessageId(message.id);
     if (!portalMessageId) return;
-    const portalMessages = getPortalMessages(portalMessageId);
+    const portalMessages = helpers.getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
     // Delete linked messages
     for (const [messageId, portalMessage] of portalMessages) {
         // Find channel and message objects
-        const channel = await safeFetchChannel(portalMessage.channelId);
+        const channel = await helpers.safeFetchChannel(portalMessage.channelId);
         if (!channel) continue;
-        const message = await safeFetchMessage(
+        const message = await helpers.safeFetchMessage(
             channel,
             portalMessage.messageId
         );
         if (!message) continue;
 
         // Attempt to delete message
-        const result = await deleteMessage(channel, portalMessage.messageId);
+        const result = await helpers.deleteMessage(channel, portalMessage.messageId);
         // If result is an Error we couldn't delete the message
         if (result instanceof Error) {
             channel.send(
@@ -1357,7 +716,7 @@ client.on(Events.MessageDelete, async (message) => {
         }
     }
     // Delete portal message
-    deletePortalMessages(message.id);
+    helpers.deletePortalMessages(message.id);
 });
 
 // Edit messages
@@ -1366,24 +725,24 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     if (newMessage.webhookId) return;
 
     // Check if message is a portal message
-    const portalMessageId = getPortalMessageId(newMessage.id);
+    const portalMessageId = helpers.getPortalMessageId(newMessage.id);
     if (!portalMessageId) return;
-    const portalMessages = getPortalMessages(portalMessageId);
+    const portalMessages = helpers.getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
     // Edit linked messages
     for (const [messageId, portalMessage] of portalMessages) {
         // Find channel and message objects
-        const channel = await safeFetchChannel(portalMessage.channelId);
+        const channel = await helpers.safeFetchChannel(portalMessage.channelId);
         if (!channel) continue;
-        const message = await safeFetchMessage(
+        const message = await helpers.safeFetchMessage(
             channel,
             portalMessage.messageId
         );
         if (!message) continue;
 
         // Attempt to edit message
-        await editMessage(channel, portalMessage.messageId, {
+        await helpers.editMessage(channel, portalMessage.messageId, {
             content: newMessage.content,
             // files: newMessage.attachments.map((a) => ({
             //     attachment: a.url,
@@ -1403,17 +762,17 @@ client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
     if (newChannel.type !== ChannelType.GuildText) return;
 
     // Check if channel is a portal channel
-    const portalConnection = getPortalConnection(newChannel.id);
+    const portalConnection = helpers.getPortalConnection(newChannel.id);
     if (!portalConnection) return;
 
     // Update portal connection
-    updatePortalConnection(newChannel.id, {
+    helpers.updatePortalConnection(newChannel.id, {
         channelName: newChannel.name,
         guildName: newChannel.guild.name,
     });
 
     // Check of nsfw change
-    const portal = getPortal(portalConnection.portalId);
+    const portal = helpers.getPortal(portalConnection.portalId);
     if (!portal) return;
     // Suspend portal if nsfw changed
     if (portal.nsfw !== newChannel.nsfw) {
@@ -1423,10 +782,13 @@ client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
 
 // Reactions
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
+    // Ignore self
+    if (user.id === client.user?.id) return;
+
     // Check if message is a portal message
-    const portalMessageId = getPortalMessageId(reaction.message.id);
+    const portalMessageId = helpers.getPortalMessageId(reaction.message.id);
     if (!portalMessageId) return;
-    const portalMessages = getPortalMessages(portalMessageId);
+    const portalMessages = helpers.getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
     console.log(`Reacting with ${reaction.emoji} to ${portalMessages.size} messages.`);
@@ -1434,19 +796,20 @@ client.on(Events.MessageReactionAdd, async (reaction, user) => {
     // Add reaction to linked messages if we have access to it
     for (const [messageId, portalMessage] of portalMessages) {
         // Ignore original message
-        if (messageId === reaction.message.id) continue;
+        //// if (messageId === reaction.message.id) continue;
+        // ? For now we'll also react to the original message, so you can see that the bot has reacted to it
 
         // Find channel and message objects
-        const channel = await safeFetchChannel(portalMessage.channelId);
+        const channel = await helpers.safeFetchChannel(portalMessage.channelId);
         if (!channel) continue;
-        const message = await safeFetchMessage(
+        const message = await helpers.safeFetchMessage(
             channel,
             portalMessage.messageId
         );
         if (!message) continue;
 
         // Attempt to add reaction
-        await addReaction(message, reaction.emoji); // TODO: 1. Check if we have access to the emoji. 2. Remove reaction if it disappears from the original message
+        await helpers.addReaction(message, reaction.emoji); // TODO: 1. Check if we have access to the emoji. 2. Remove reaction if it disappears from the original message
     }
 });
 
@@ -1465,11 +828,11 @@ client.on(Events.InteractionCreate, async (interaction) => {
             switch (interaction.customId) {
                 case "portalSelect": {
                     const portalId = interaction.values[0];
-                    const portal = getPortal(portalId);
+                    const portal = helpers.getPortal(portalId);
 
                     // Add portal to setup
                     const setup = connectionSetups.get(interaction.user.id);
-                    if (!setup) return sendExpired(interaction);
+                    if (!setup) return helpers.sendExpired(interaction);
                     setup.portalId = portalId;
                     setup.expires = Date.now() + 60000;
 
@@ -1542,7 +905,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     );
                     const setup = connectionSetups.get(interaction.user.id);
                     if (!portalCreation || !setup)
-                        return sendExpired(interaction);
+                        return helpers.sendExpired(interaction);
 
                     const nsfw = interaction.values[0] === "nsfw";
 
@@ -1850,10 +1213,10 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 case "portalJoin": {
                     // Join portal
                     const setup = connectionSetups.get(interaction.user.id);
-                    if (!setup) return sendExpired(interaction);
+                    if (!setup) return helpers.sendExpired(interaction);
 
                     // Join portal
-                    const portalConnection = await createPortalConnection({
+                    const portalConnection = await helpers.createPortalConnection({
                         portalId: setup.portalId,
                         channelId: setup.channelId,
                     });
@@ -1865,7 +1228,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                         });
                         return;
                     }
-                    const portal = getPortal(portalConnection.portalId);
+                    const portal = helpers.getPortal(portalConnection.portalId);
                     if (!portal) {
                         interaction.reply({
                             content:
@@ -1887,13 +1250,13 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 case "portalJoinInvite": {
                     // Get setup
                     const setup = connectionSetups.get(interaction.user.id);
-                    if (!setup) return sendExpired(interaction);
+                    if (!setup) return helpers.sendExpired(interaction);
 
                     // Create invite
-                    const invite = await createInvite(interaction.channel);
+                    const invite = await helpers.createInvite(interaction.channel);
 
                     // Join portal
-                    const portalConnection = await createPortalConnection({
+                    const portalConnection = await helpers.createPortalConnection({
                         portalId: setup.portalId,
                         channelId: setup.channelId,
                         guildInvite: invite instanceof Error ? "" : invite.code,
@@ -1906,7 +1269,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                         });
                         return;
                     }
-                    const portal = getPortal(portalConnection.portalId);
+                    const portal = helpers.getPortal(portalConnection.portalId);
                     if (!portal) {
                         interaction.reply({
                             content:
@@ -1940,7 +1303,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                                         type: ComponentType.TextInput,
                                         customId: "portalName",
                                         label: "Portal name",
-                                        placeholder: generateName(),
+                                        placeholder: helpers.generateName(),
                                         maxLength: 64,
                                         minLength: 1,
                                         style: TextInputStyle.Short,
@@ -1954,9 +1317,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 case "portalCreateConfirm": {
                     // Confirm creation of new portal
                     const portalSetup = portalSetups.get(interaction.user.id);
-                    if (!portalSetup) return sendExpired(interaction);
+                    if (!portalSetup) return helpers.sendExpired(interaction);
 
-                    const portal = createPortal({
+                    const portal = helpers.createPortal({
                         name: portalSetup.name,
                         emoji: portalSetup.emoji,
                         customEmoji: portalSetup.customEmoji,
@@ -1966,7 +1329,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                     });
                     portalSetups.delete(interaction.user.id);
 
-                    const portalConnection = await createPortalConnection({
+                    const portalConnection = await helpers.createPortalConnection({
                         portalId: portal.id,
                         channelId: portalSetup.channelId,
                     });
@@ -1991,7 +1354,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 case "portalSelectCancel": {
                     // Cancel portal selection
                     const setup = connectionSetups.get(interaction.user.id);
-                    if (!setup) return sendExpired(interaction);
+                    if (!setup) return helpers.sendExpired(interaction);
 
                     connectionSetups.delete(interaction.user.id);
                     interaction.update({
@@ -2003,7 +1366,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 case "portalCreateCancel": {
                     // Cancel portal creation
                     const portalSetup = portalSetups.get(interaction.user.id);
-                    if (!portalSetup) return sendExpired(interaction);
+                    if (!portalSetup) return helpers.sendExpired(interaction);
 
                     portalSetups.delete(interaction.user.id);
                     interaction.update({
@@ -2020,7 +1383,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
             switch (interaction.customId) {
                 case "portalCreateModal": {
                     const setup = connectionSetups.get(interaction.user.id);
-                    if (!setup) return sendExpired(interaction);
+                    if (!setup) return helpers.sendExpired(interaction);
                     const portalName =
                         interaction.fields.getTextInputValue("portalName");
 
@@ -2072,14 +1435,14 @@ client.on(Events.InteractionCreate, async (interaction) => {
                                 interaction.user.id
                             );
                             if (!portalCreation)
-                                return sendExpired(interaction);
+                                return helpers.sendExpired(interaction);
 
                             portalCreation.emoji =
                                 reaction.emoji.toString() || "";
                             portalCreation.customEmoji = reaction.emoji.id
                                 ? true
                                 : false;
-                            portalCreation.portalId = generatePortalId();
+                            portalCreation.portalId = helpers.generatePortalId();
 
                             portalSetups.set(
                                 interaction.user.id,
@@ -2182,8 +1545,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
                         interaction.user.id
                     );
                     const setup = connectionSetups.get(interaction.user.id);
-                    if (!portalCreation) return sendExpired(interaction);
-                    if (!setup) return sendExpired(interaction);
+                    if (!portalCreation) return helpers.sendExpired(interaction);
+                    if (!setup) return helpers.sendExpired(interaction);
 
                     const password =
                         interaction.fields.getTextInputValue("portalPassword");
@@ -2272,21 +1635,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
                 }
                 case "portalPasswordPrompt": {
                     const setup = connectionSetups.get(interaction.user.id);
-                    if (!setup) return sendExpired(interaction);
+                    if (!setup) return helpers.sendExpired(interaction);
 
                     const password =
                         interaction.fields.getTextInputValue("portalPassword");
-                    if (!password) return sendExpired(interaction);
+                    if (!password) return helpers.sendExpired(interaction);
 
-                    const portal = getPortal(setup.portalId);
-                    if (!portal) return sendExpired(interaction);
+                    const portal = helpers.getPortal(setup.portalId);
+                    if (!portal) return helpers.sendExpired(interaction);
 
                     if (portal.password !== password) {
                         interaction.reply({
                             content: "Incorrect password.",
                             ephemeral: true,
                         });
-                        const portals = getPortals();
+                        const portals = helpers.getPortals();
                         interaction.message.edit({
                             content: `__Selected channel:__ <#${interaction.channel.id}>.\n${portalIntro.portal}.`,
                             components: [
