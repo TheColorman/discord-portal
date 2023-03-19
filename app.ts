@@ -195,11 +195,11 @@ client.on(Events.MessageCreate, async (message) => {
             // Remove send permissions from user
             if (!message.member) return;
             try {
-                message.channel.permissionOverwrites.create(message.member, {
+                await message.channel.permissionOverwrites.create(message.member, {
                     SendMessages: false,
                 });
             } catch (err) {
-                console.error(err);
+                // console.error(err);
             }
             return;
         }
@@ -908,7 +908,7 @@ client.on(Events.MessageCreate, async (message) => {
                     try {
                         await channel.permissionOverwrites.delete(member);
                     } catch (e) {
-                        console.error(e);
+                        // console.error(e);
                     }
                 }
                 message.reply({
@@ -2071,7 +2071,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
                             );
                             await channel.permissionOverwrites.delete(member);
                         } catch (e) {
-                            console.error(e);
+                            // console.error(e);
                         }
                     }
                     interaction.reply({
