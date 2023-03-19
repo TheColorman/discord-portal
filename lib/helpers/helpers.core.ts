@@ -59,6 +59,7 @@ export default class BaseHelpersCore {
         res.body.pipe(PNGstream);
         // Output as .gif
         ffmpeg(`./stickers/${id}.png`).saveToFile(`./stickers/${id}.gif`);
+        return `./stickers/${id}.gif`;
     }
 
     /**
