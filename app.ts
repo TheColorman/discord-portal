@@ -116,7 +116,7 @@ db.prepare(
 ).run();
 
 // Dirs
-if (!fs.existsSync("./stickers")) fs.mkdirSync("./stickers");
+if (!fs.existsSync("./stickers/")) fs.mkdirSync("./stickers/");
 
 // Create default portal if none exists
 if (!db.prepare("SELECT COUNT(1) FROM portals").get()) {
@@ -244,56 +244,66 @@ client.on(Events.MessageCreate, async (message) => {
         }
         // Stickers
         const stickers: string[] = [];
-        for (const [stickerId, sticker] of message.stickers) {
-            // Check if we already have the sticker ID in the ./stickers/ folder
-            const stickerFile = fs
-                .readdirSync("./stickers/")
-                .find((f) => f === `${stickerId}.gif`);
-            if (!stickerFile) {
-                // Create file
-                const res = await fetch(sticker.url);
-                if (!res.body) continue;
-                const PNGstream = fs.createWriteStream(
-                    `./stickers/${stickerId}.png`
-                );
-                res.body.pipe(PNGstream);
-                // Output as .gif
-                ffmpeg(`./stickers/${stickerId}.png`).saveToFile(
-                    `./stickers/${stickerId}.gif`
-                );
-                // Delete old .png file
-                fs.unlinkSync(`./stickers/${stickerId}.png`);
-            }
-            // Update "last modified" time
-            try {
-                fs.utimesSync(
-                    `./stickers/${stickerId}.gif`,
-                    new Date(),
-                    new Date()
-                );
-            } catch (err) {
-                console.error(err);
-            }
-            stickers.push(`./stickers/${stickerId}.gif`);
-        }
-        // If there are more than 20 .gif files, delete the oldest ones
-        const stickerFiles = fs.readdirSync("./stickers/");
-        if (stickerFiles.length > MAX_STICKERS_ON_DISK) {
-            stickerFiles.sort((a, b) => {
-                return (
-                    fs.statSync(`./stickers/${a}`).mtime.getTime() -
-                    fs.statSync(`./stickers/${b}`).mtime.getTime()
-                );
-            });
-            for (
-                let i = 0;
-                i < stickerFiles.length - MAX_STICKERS_ON_DISK;
-                i++
-            ) {
+        if (message.stickers.size) {
+            for (const [stickerId, sticker] of message.stickers) {
+                // Check if we already have the sticker ID in the ./stickers/ folder
+                const stickerFile = fs
+                    .readdirSync("./stickers/")
+                    .find((f) => f === `${stickerId}.gif`);
+                if (!stickerFile) {
+                    // Create file
+                    const res = await fetch(sticker.url);
+                    if (!res.body) continue;
+                    const PNGstream = fs.createWriteStream(
+                        `./stickers/${stickerId}.png`
+                    );
+                    res.body.pipe(PNGstream);
+                    // Output as .gif
+                    ffmpeg(`./stickers/${stickerId}.png`).saveToFile(
+                        `./stickers/${stickerId}.gif`
+                    );
+                }
+                // Update "last modified" time
                 try {
-                    fs.unlinkSync(`./stickers/${stickerFiles[i]}`);
+                    fs.utimesSync(
+                        `./stickers/${stickerId}.gif`,
+                        new Date(),
+                        new Date()
+                    );
                 } catch (err) {
                     console.error(err);
+                }
+                stickers.push(`./stickers/${stickerId}.gif`);
+            }
+            // Delete all PNG files.
+            // Then, if there are more than 20 .gif files, delete the oldest ones
+            const stickerFiles = fs.readdirSync("./stickers/");
+            for (const file of stickerFiles) {
+                if (file.endsWith(".png")) {
+                    try {
+                        fs.unlinkSync(`./stickers/${file}`);
+                    } catch (err) {
+                        console.error(err);
+                    }
+                }
+            }
+            if (stickerFiles.length > MAX_STICKERS_ON_DISK) {
+                stickerFiles.sort((a, b) => {
+                    return (
+                        fs.statSync(`./stickers/${a}`).mtime.getTime() -
+                        fs.statSync(`./stickers/${b}`).mtime.getTime()
+                    );
+                });
+                for (
+                    let i = 0;
+                    i < stickerFiles.length - MAX_STICKERS_ON_DISK;
+                    i++
+                ) {
+                    try {
+                        fs.unlinkSync(`./stickers/${stickerFiles[i]}`);
+                    } catch (err) {
+                        console.error(err);
+                    }
                 }
             }
         }
