@@ -1,7 +1,6 @@
 import {
     Client,
     GuildEmoji,
-    GuildMember,
     Invite,
     Message,
     MessagePayload,
@@ -13,7 +12,7 @@ import {
 } from "discord.js";
 import DatabaseHelpersCore from "./database_helpers.core";
 import { Database } from "better-sqlite3";
-import { PortalConnection, Permissions } from "../types";
+import { PortalConnection } from "../types";
 import { webhookAvatars } from "../const";
 
 export default class DiscordHelpersCore extends DatabaseHelpersCore {
@@ -128,8 +127,8 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             if (!webhook) return Error("No webhook found.");
             return await webhook.editMessage(messageId, options);
         } catch (err) {
-            console.log("Failed to edit message using webhook.");
-            console.error(err);
+            // We probably failed because the channel has multiple webhooks
+            this.deleteWebhooks(channel);
             return null;
         }
     }
@@ -249,6 +248,23 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
         if (!webhook) return null;
         webhook.delete();
         return webhook;
+    }
+
+    /**
+     * Delete all webhooks for a Discord channel.
+     * @param channel Discord channel or id
+     */
+    public async deleteWebhooks(channel: string | TextChannel) {
+        if (typeof channel === "string") {
+            const fetchedChannel = await this.safeFetchChannel(channel);
+            if (!fetchedChannel) return;
+            channel = fetchedChannel;
+        }
+        const webhooks = await channel.fetchWebhooks();
+        for (const [id, webhook] of webhooks) {
+            if (!webhook.token) continue;
+            webhook.delete();
+        }
     }
 
     /**
