@@ -46,20 +46,44 @@ export default class BaseHelpersCore {
     }
 
     /**
-     * Convert a web APNG file to a local .gif file.
+     * Convert a web APNG file to a local .gif file. If it fails, returns local .png file.
      * @param url Web URL of the APNG file
      * @param id ID used to name the file
-     * @returns Path to local .gif file
+     * @returns Path to local .gif file or .png file if conversion fails
      */
     public async convertAPNGtoGIF(url: string, id: string) {
         // Create file
-        const res = await fetch(url);
-        if (!res.body) return null;
+        const response = await fetch(url);
+        if (!response.body) return null;
         const PNGstream = fs.createWriteStream(`./stickers/${id}.png`);
-        res.body.pipe(PNGstream);
+        response.body.pipe(PNGstream);
+        // Wait for file to be created
+        await new Promise((resolve) => {
+            PNGstream.on("finish", resolve);
+        });
+
         // Output as .gif
-        ffmpeg(`./stickers/${id}.png`).saveToFile(`./stickers/${id}.gif`);
-        return `./stickers/${id}.gif`;
+        try {
+            // Wait for conversion to finishimage.png
+            await new Promise((resolve, reject) => {
+                ffmpeg(`./stickers/${id}.png`)
+                    .addOption([
+                        "-gifflags -offsetting",
+                        "-lavfi split[v],palettegen,[v]paletteuse",
+                    ])
+                    .saveToFile(`./stickers/${id}.gif`)
+                    .on("end", resolve)
+                    .on("error", reject);
+            });
+            return `./stickers/${id}.gif`;
+        } catch (err) {
+            // console.error(err);
+            // There was an error, so the .gif file is likely corrupted.
+            // Delete it and return the .png file instead.
+            if (fs.existsSync(`./stickers/${id}.gif`))
+                fs.unlinkSync(`./stickers/${id}.gif`);
+            return `./stickers/${id}.png`;
+        }
     }
 
     /**
@@ -68,7 +92,7 @@ export default class BaseHelpersCore {
     public cleanStickerCache() {
         // Delete all PNG files.
         // Then, if there are more than 20 .gif files, delete the oldest ones
-        const stickerFiles = fs.readdirSync("./stickers/");
+        let stickerFiles = fs.readdirSync("./stickers/");
         for (const file of stickerFiles) {
             if (file.endsWith(".png")) {
                 try {
@@ -78,6 +102,7 @@ export default class BaseHelpersCore {
                 }
             }
         }
+        stickerFiles = fs.readdirSync("./stickers/");
         if (stickerFiles.length > MAX_STICKERS_ON_DISK) {
             stickerFiles.sort((a, b) => {
                 return (
@@ -108,18 +133,17 @@ export default class BaseHelpersCore {
         const stickerFile = fs
             .readdirSync("./stickers/")
             .find((f) => f === `${sticker.id}.gif`);
-        if (!stickerFile) this.convertAPNGtoGIF(sticker.url, sticker.id);
+        const stickerPath = stickerFile
+            ? `./stickers/${stickerFile}`
+            : await this.convertAPNGtoGIF(sticker.url, sticker.id);
 
+        if (!stickerPath) return null;
         // Update "last modified" time
         try {
-            fs.utimesSync(
-                `./stickers/${sticker.id}.gif`,
-                new Date(),
-                new Date()
-            );
+            fs.utimesSync(stickerPath, new Date(), new Date());
         } catch (err) {
             console.error(err);
         }
-        return `./stickers/${sticker.id}.gif`;
+        return stickerPath;
     }
 }

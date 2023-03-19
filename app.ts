@@ -17,12 +17,10 @@ import {
 } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
-import ffmpeg from "fluent-ffmpeg";
-import { PREFIX, ADMINS, MAX_STICKERS_ON_DISK } from "./config.json";
+import { PREFIX, ADMINS } from "./config.json";
 import DiscordHelpersCore from "./lib/helpers/discord_helpers.core";
 import { UserId } from "./lib/types";
 import * as fs from "fs";
-import fetch from "node-fetch";
 dotenv.config();
 
 Error.stackTraceLimit = Infinity; //! Remove in production
@@ -247,9 +245,11 @@ client.on(Events.MessageCreate, async (message) => {
         if (message.stickers.size) {
             for (const [stickerId, sticker] of message.stickers) {
                 const stickerFile = await helpers.stickerToGIF(sticker);
+                if (!stickerFile) continue;
                 stickers.push(stickerFile);
             }
-            helpers.cleanStickerCache();
+            // Clean cache if file is not a PNG
+            if (!stickers.some(sticker => sticker.endsWith(".png"))) helpers.cleanStickerCache();
         }
 
         // Replies
