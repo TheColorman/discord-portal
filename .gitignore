@@ -132,3 +132,6 @@ app.js
 
 # TypeScript
 *.js
+
+# Other
+stickers/
