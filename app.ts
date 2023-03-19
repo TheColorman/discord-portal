@@ -9,17 +9,20 @@ import {
     User,
     Embed,
     ChannelType,
-    PermissionFlagsBits,
     ContextMenuCommandBuilder,
     ApplicationCommandType,
     Routes,
     REST,
+    AttachmentBuilder,
 } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
-import { PREFIX, ADMINS } from "./config.json";
+import ffmpeg from "fluent-ffmpeg";
+import { PREFIX, ADMINS, MAX_STICKERS_ON_DISK } from "./config.json";
 import DiscordHelpersCore from "./lib/helpers/discord_helpers.core";
 import { UserId } from "./lib/types";
+import * as fs from "fs";
+import fetch from "node-fetch";
 dotenv.config();
 
 Error.stackTraceLimit = Infinity; //! Remove in production
@@ -111,6 +114,10 @@ db.prepare(
         FOREIGN KEY(portalId) REFERENCES portals(id)
     )`
 ).run();
+
+// Dirs
+if (!fs.existsSync("./stickers")) fs.mkdirSync("./stickers");
+
 // Create default portal if none exists
 if (!db.prepare("SELECT COUNT(1) FROM portals").get()) {
     db.prepare(
@@ -236,7 +243,61 @@ client.on(Events.MessageCreate, async (message) => {
             }
         }
         // Stickers
-        message.content += "\n" + message.stickers.map((s) => s.url).join("\n");
+        const stickers: string[] = [];
+        for (const [stickerId, sticker] of message.stickers) {
+            // Check if we already have the sticker ID in the ./stickers/ folder
+            const stickerFile = fs
+                .readdirSync("./stickers/")
+                .find((f) => f === `${stickerId}.gif`);
+            if (!stickerFile) {
+                // Create file
+                const res = await fetch(sticker.url);
+                if (!res.body) continue;
+                const PNGstream = fs.createWriteStream(
+                    `./stickers/${stickerId}.png`
+                );
+                res.body.pipe(PNGstream);
+                // Output as .gif
+                ffmpeg(`./stickers/${stickerId}.png`).saveToFile(
+                    `./stickers/${stickerId}.gif`
+                );
+                // Delete old .png file
+                fs.unlinkSync(`./stickers/${stickerId}.png`);
+            }
+            // Update "last modified" time
+            try {
+                fs.utimesSync(
+                    `./stickers/${stickerId}.gif`,
+                    new Date(),
+                    new Date()
+                );
+            } catch (err) {
+                console.error(err);
+            }
+            stickers.push(`./stickers/${stickerId}.gif`);
+        }
+        // If there are more than 20 .gif files, delete the oldest ones
+        const stickerFiles = fs.readdirSync("./stickers/");
+        if (stickerFiles.length > MAX_STICKERS_ON_DISK) {
+            stickerFiles.sort((a, b) => {
+                return (
+                    fs.statSync(`./stickers/${a}`).mtime.getTime() -
+                    fs.statSync(`./stickers/${b}`).mtime.getTime()
+                );
+            });
+            for (
+                let i = 0;
+                i < stickerFiles.length - MAX_STICKERS_ON_DISK;
+                i++
+            ) {
+                try {
+                    fs.unlinkSync(`./stickers/${stickerFiles[i]}`);
+                } catch (err) {
+                    console.error(err);
+                }
+            }
+        }
+
         // Replies
         const originalReference = message.reference?.messageId
             ? await helpers.safeFetchMessage(
@@ -388,6 +449,7 @@ client.on(Events.MessageCreate, async (message) => {
                 allowedMentions: {
                     parse: ["users"],
                 },
+                files: stickers.map((s) => new AttachmentBuilder(s)),
             });
 
             helpers.createPortalMessage({
@@ -840,13 +902,8 @@ client.on(Events.MessageCreate, async (message) => {
                 // Remove permissions in all channels
                 const portalConnections =
                     helpers.getPortalConnections(portalId);
-                for (const [
-                    channelId,
-                    portalConnection,
-                ] of portalConnections) {
-                    const channel = await helpers.safeFetchChannel(
-                        channelId
-                    );
+                for (const [channelId, portalConnection] of portalConnections) {
+                    const channel = await helpers.safeFetchChannel(channelId);
                     if (!channel) continue;
                     try {
                         await channel.permissionOverwrites.delete(member);
