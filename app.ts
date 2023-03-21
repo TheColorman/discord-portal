@@ -165,13 +165,13 @@ client.on(Events.MessageCreate, async (message) => {
     if (message.webhookId) return;
     // Ignore if DM
     if (!message.guildId) return;
-    // Ignore if not TextChannel
-    if (message.channel.type !== ChannelType.GuildText) return;
+    // Ignore if not ValidChannel
+    if (!helpers.isValidChannel(message.channel)) return;
 
     // Portal functionality
     (async () => {
-        // why do I have to check this type again? ask typescript...
-        if (message.channel.type !== ChannelType.GuildText) return;
+        // why do I have to check this type again?
+        if (!helpers.isValidChannel(message.channel)) return;
 
         const portalConnection = helpers.getPortalConnection(
             message.channel.id

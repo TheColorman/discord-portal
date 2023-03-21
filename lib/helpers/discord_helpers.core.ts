@@ -1,4 +1,5 @@
 import {
+    ChannelType,
     Client,
     GuildEmoji,
     Invite,
@@ -6,13 +7,12 @@ import {
     MessagePayload,
     PermissionFlagsBits,
     ReactionEmoji,
-    TextChannel,
     Webhook,
     WebhookEditMessageOptions,
 } from "discord.js";
 import DatabaseHelpersCore from "./database_helpers.core";
 import { Database } from "better-sqlite3";
-import { PortalConnection } from "../types";
+import { DiscordChannel, PortalConnection, ValidChannel } from "../types";
 import { webhookAvatars } from "../const";
 
 export default class DiscordHelpersCore extends DatabaseHelpersCore {
@@ -93,7 +93,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      * @returns A Discord Message if it was found, null otherwise
      */
     public async safeFetchMessage(
-        channel: TextChannel,
+        channel: ValidChannel,
         messageId: string
     ): Promise<Message<true> | null> {
         try {
@@ -111,7 +111,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      * @returns The edited message if successful, null otherwise
      */
     public async editMessage(
-        channel: TextChannel,
+        channel: ValidChannel,
         messageId: string,
         options: string | MessagePayload | WebhookEditMessageOptions
     ): Promise<Error | Message<boolean> | null> {
@@ -140,7 +140,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      * @returns The deleted message if successful, an Error object otherwise
      */
     public async deleteMessage(
-        channel: TextChannel,
+        channel: ValidChannel,
         messageId: string
     ): Promise<Error | Message<true> | null> {
         // Fetch message
@@ -176,9 +176,9 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      */
     public async safeFetchChannel(
         channelId: string
-    ): Promise<TextChannel | null> {
+    ): Promise<ValidChannel | null> {
         try {
-            return (await this.client.channels.fetch(channelId)) as TextChannel;
+            return (await this.client.channels.fetch(channelId)) as ValidChannel;
         } catch (err) {
             console.log("Failed to fetch channel.");
             // console.error(err);
@@ -191,7 +191,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      * @param channel Discord channel where the webhook should be created
      * @returns Discord Webhook
      */
-    public async createWebhook(channel: TextChannel): Promise<Webhook> {
+    public async createWebhook(channel: ValidChannel): Promise<Webhook> {
         const webhook = await channel.createWebhook({
             name: "Portal connection",
             avatar: webhookAvatars[
@@ -211,7 +211,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
         channel,
         webhookId,
     }: {
-        channel: string | TextChannel;
+        channel: string | ValidChannel;
         webhookId?: string;
     }): Promise<Webhook | null> {
         if (typeof channel === "string") {
@@ -241,7 +241,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
         channel,
         webhookId,
     }: {
-        channel: string | TextChannel;
+        channel: string | ValidChannel ;
         webhookId?: string;
     }): Promise<Webhook | null> {
         const webhook = await this.getWebhook({ channel, webhookId });
@@ -254,7 +254,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      * Delete all webhooks for a Discord channel.
      * @param channel Discord channel or id
      */
-    public async deleteWebhooks(channel: string | TextChannel) {
+    public async deleteWebhooks(channel: string | ValidChannel) {
         if (typeof channel === "string") {
             const fetchedChannel = await this.safeFetchChannel(channel);
             if (!fetchedChannel) return;
@@ -290,7 +290,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      * @param channel Discord channel to create the invite in
      * @returns A Discord Invite if successful, an Error object otherwise
      */
-    public async createInvite(channel: TextChannel): Promise<Invite | Error> {
+    public async createInvite(channel: ValidChannel): Promise<Invite | Error> {
         try {
             return await channel.createInvite({
                 temporary: false,
@@ -322,5 +322,20 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             // console.error(err);
             // TODO: Check whether we have access to the emoji before trying to react
         }
+    }
+
+    /**
+     * Check if a Discord channel is a valid channel for a portal.
+     * @param channel A Discord channel
+     * @returns Whether the channel is a valid channel for a portal
+     */
+    public isValidChannel(channel: DiscordChannel): channel is ValidChannel {
+        return (
+            channel.type === ChannelType.GuildText ||
+            channel.type === ChannelType.GuildAnnouncement ||
+            channel.type === ChannelType.AnnouncementThread ||
+            channel.type === ChannelType.PublicThread ||
+            channel.type === ChannelType.PrivateThread
+        );
     }
 }

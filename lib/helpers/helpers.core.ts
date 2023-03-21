@@ -1,4 +1,7 @@
-import { Interaction, Sticker } from "discord.js";
+import {
+    Interaction,
+    Sticker,
+} from "discord.js";
 import * as fs from "fs";
 import fetch from "node-fetch";
 import ffmpeg from "fluent-ffmpeg";
