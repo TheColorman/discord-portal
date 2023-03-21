@@ -193,9 +193,12 @@ client.on(Events.MessageCreate, async (message) => {
             // Remove send permissions from user
             if (!message.member) return;
             try {
-                await message.channel.permissionOverwrites.create(message.member, {
-                    SendMessages: false,
-                });
+                await message.channel.permissionOverwrites.create(
+                    message.member,
+                    {
+                        SendMessages: false,
+                    }
+                );
             } catch (err) {
                 // console.error(err);
             }
@@ -249,7 +252,8 @@ client.on(Events.MessageCreate, async (message) => {
                 stickers.push(stickerFile);
             }
             // Clean cache if file is not a PNG
-            if (!stickers.some(sticker => sticker.endsWith(".png"))) helpers.cleanStickerCache();
+            if (!stickers.some((sticker) => sticker.endsWith(".png")))
+                helpers.cleanStickerCache();
         }
 
         // Replies
@@ -390,13 +394,18 @@ client.on(Events.MessageCreate, async (message) => {
             // Send a separate message for each attachment to prevent uploading them all again
             const attachments = message.attachments.toJSON();
 
+            const username = `${message.author.tag} ${
+                message.guild?.name ? ` @ ${message.guild.name}` : ""
+            }`;
+
             const firstMessage = await webhook.send({
                 content: newContent.trim()
                     ? newContent
                     : attachments.shift()?.url,
-                username: `${message.author.tag} ${
-                    message.guild?.name ? ` @ ${message.guild.name}` : ""
-                }`,
+                username:
+                    username.length > 80
+                        ? username.slice(0, 77) + "..."
+                        : username,
                 avatarURL: message.author.avatarURL() || undefined,
                 embeds: embeds,
                 tts: message.tts,
