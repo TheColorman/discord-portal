@@ -79,10 +79,9 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
         await this.deleteWebhook({ channel: channelId });
 
         // Delete portal connection
-        this.run(
-            "DELETE FROM portalConnections WHERE channelId = ?",
-            channelId
-        );
+        this.run("DELETE FROM portalConnections WHERE channelId = ?", [
+            channelId,
+        ]);
         return portalConnection;
     }
 
@@ -178,7 +177,9 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
         channelId: string
     ): Promise<ValidChannel | null> {
         try {
-            return (await this.client.channels.fetch(channelId)) as ValidChannel;
+            return (await this.client.channels.fetch(
+                channelId
+            )) as ValidChannel;
         } catch (err) {
             console.log("Failed to fetch channel.");
             // console.error(err);
@@ -241,7 +242,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
         channel,
         webhookId,
     }: {
-        channel: string | ValidChannel ;
+        channel: string | ValidChannel;
         webhookId?: string;
     }): Promise<Webhook | null> {
         const webhook = await this.getWebhook({ channel, webhookId });

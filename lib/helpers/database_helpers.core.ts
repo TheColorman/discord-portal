@@ -12,6 +12,7 @@ import {
     PortalMessageId,
     UserId,
     LimitedAccount,
+    SQlite3Bind,
 } from "../types";
 import { Collection } from "discord.js";
 
@@ -27,7 +28,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
      * @param query An SQL query
      * @param params Parameters for the SQL query
      */
-    public run(query: string, ...params: any[]): void {
+    public run(query: string, params: SQlite3Bind[]): void {
         this.db.prepare(query).run(params);
     }
 

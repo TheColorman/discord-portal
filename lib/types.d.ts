@@ -67,3 +67,4 @@ export type DiscordChannel =
     | PartialDMChannel
     | VoiceChannel
     | ThreadChannel;
+export type SQlite3Bind = Number | String | BigInt | Buffer | null;
