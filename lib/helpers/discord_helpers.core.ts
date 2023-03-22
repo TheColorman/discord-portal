@@ -12,7 +12,13 @@ import {
 } from "discord.js";
 import DatabaseHelpersCore from "./database_helpers.core";
 import { Database } from "better-sqlite3";
-import { DiscordChannel, PortalConnection, ValidChannel } from "../types";
+import {
+    DiscordChannel,
+    PortalConnection,
+    PortalSourceMessage,
+    PortalWebhookMessage,
+    ValidChannel,
+} from "../types";
 import { webhookAvatars } from "../const";
 
 export default class DiscordHelpersCore extends DatabaseHelpersCore {
@@ -347,5 +353,27 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      */
     public isGuildMessage(message: Message): message is Message<true> {
         return !!message.guildId;
+    }
+
+    /**
+     * Check if a Discord message is a portal source message.
+     * @param message A Discord message
+     * @returns Whether the message is a portal source message
+     */
+    public isPortalSourceMessage(
+        message: Message
+    ): message is PortalSourceMessage {
+        const portalMessage = this.getPortalMessage(message.id);
+        return portalMessage?.messageType === "original";
+    }
+
+    public isPortalWebhookMessage(
+        message: Message
+    ): message is PortalWebhookMessage {
+        const portalMessage = this.getPortalMessage(message.id);
+        return (
+            portalMessage?.messageType === "linked" ||
+            portalMessage?.messageType === "linkedAttachment"
+        );
     }
 }

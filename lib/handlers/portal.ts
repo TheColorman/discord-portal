@@ -1,5 +1,6 @@
 import { AttachmentBuilder, Embed, Message } from "discord.js";
 import DiscordHelpersCore from "../helpers/discord_helpers.core";
+import { PortalDiscordMessage } from "../types";
 
 async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
     // why do I have to check this type again?
@@ -84,12 +85,15 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
     }
 
     // Replies
-    const originalReference = message.reference?.messageId
-        ? await helpers.safeFetchMessage(
-              message.channel,
-              message.reference.messageId
-          )
-        : null;
+    const originalReference = (
+        message.reference?.messageId
+            ? await helpers.safeFetchMessage(
+                  message.channel,
+                  message.reference.messageId
+              )
+            : null
+    ) as PortalDiscordMessage | null;
+
     let content = message.content;
     const getLinked = async () => {
         const failed = "`[Reply failed]`\n";
@@ -158,10 +162,10 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
         if (portalConnection.channelId === message.channel.id) return;
 
         // Get channel
-        const channel = await helpers.safeFetchChannel(
+        const localChannel = await helpers.safeFetchChannel(
             portalConnection.channelId
         );
-        if (!channel) {
+        if (!localChannel) {
             // Remove connection if channel is not found
             helpers.deletePortalConnection(portalConnection.channelId);
             return;
@@ -171,39 +175,69 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
 
         // Add replies
         if (originalReference) {
-            const buildReply = () => {
+            const buildReply = async () => {
                 if (typeof reply === "string") return reply;
                 const { refAuthorTag, refPreview, linkedPortalMessages } =
                     reply;
 
                 // Fetch the message id of the reply in the portalConnection channel
-                const localReferenceId = linkedPortalMessages.find(
+                const localPortalReference = linkedPortalMessages.find(
                     (linkedPortalMessage) =>
                         linkedPortalMessage.channelId ===
                         portalConnection.channelId
-                )?.messageId;
+                );
+                const localPortalReferenceId = localPortalReference?.id;
 
-                if (!localReferenceId) return "`[Reply failed]`\n";
+                // Propegate replies through portal
+                const replyPing = await (async () => {
+                    console.log("A");
+                    // Stop if no reference
+                    if (!originalReference) return false;
+                    console.log("B");
+                    // Stop if message is not a webhook
+                    if (!helpers.isPortalWebhookMessage(originalReference))
+                        return false;
+                    console.log("C");
+                    console.log(message.mentions.repliedUser);
+                    // Stop if the reply didn't ping
+                    //! Seems like there's no way to check whether the reply pings or not???
+                    
+                    console.log("D");
+                    // Stop if the local version of the reference is not the original source
+                    if (localPortalReference?.messageType !== "original")
+                        return false;
+                    console.log("E");
+                    // Now we can add a ping to the reply
+                    const localReferenceMessage =
+                        await helpers.safeFetchMessage(
+                            localChannel,
+                            localPortalReference.messageId
+                        );
+                    if (!localReferenceMessage) return false;
+                    return `<@${localReferenceMessage.author.id}>`;
+                })();
+
+                if (!localPortalReferenceId) return "`[Reply failed]`\n";
                 return (
-                    "[[Reply to `" +
-                    refAuthorTag +
-                    "` - `" +
+                    "[[Reply to " +
+                    (replyPing || "`" + refAuthorTag + "`") +
+                    " - `" +
                     refPreview +
                     "`]](https://discord.com/channels/" +
-                    channel.guildId +
+                    localChannel.guildId +
                     "/" +
-                    channel.id +
+                    localChannel.id +
                     "/" +
-                    localReferenceId +
+                    localPortalReferenceId +
                     ")\n"
                 );
             };
-            newContent = buildReply() + message.content;
+            newContent = await buildReply() + message.content;
         }
 
         // Get webhook
         const webhook = await helpers.getWebhook({
-            channel,
+            channel: localChannel,
             webhookId: portalConnection.webhookId,
         });
         // If no webhook was found, the channel doesn't exist and we should delete the connection

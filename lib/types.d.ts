@@ -4,6 +4,7 @@ import {
     ThreadChannel,
     PublicThreadChannel,
     PrivateThreadChannel,
+    Message,
 } from "discord.js";
 
 // Types
@@ -55,9 +56,7 @@ export type UserId = string;
 export type PortalMessageId = string;
 export type MessageType = "original" | "linked" | "linkedAttachment";
 export type Permissions = BitFieldResolvable<S, N>[];
-export type ValidChannel =
-    | TextChannel
-    | NewsChannel
+export type ValidChannel = TextChannel | NewsChannel;
 export type DiscordChannel =
     | TextChannel
     | NewsChannel
@@ -68,3 +67,6 @@ export type DiscordChannel =
     | VoiceChannel
     | ThreadChannel;
 export type SQlite3Bind = Number | String | BigInt | Buffer | null;
+export type PortalWebhookMessage = Message<true>;
+export type PortalSourceMessage = Message<true>;
+export type PortalDiscordMessage = PortalWebhookMessage | PortalSourceMessage;

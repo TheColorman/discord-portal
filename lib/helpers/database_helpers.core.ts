@@ -389,7 +389,13 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
      * @param param0 userId and portalId of the limited account to get
      * @returns Limited account status
      */
-    public getLimitedAccount({ userId, portalId }: { userId: UserId, portalId: PortalId }): LimitedAccount | null {
+    public getLimitedAccount({
+        userId,
+        portalId,
+    }: {
+        userId: UserId;
+        portalId: PortalId;
+    }): LimitedAccount | null {
         const limitedAccount = this.db
             .prepare(
                 "SELECT * FROM limitedAccounts WHERE userId = ? AND portalId = ?"
@@ -460,7 +466,10 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
             bot: boolean;
         }
     ): LimitedAccount {
-        const limitedAccount = this.getLimitedAccount({ userId, portalId: options.portalId});
+        const limitedAccount = this.getLimitedAccount({
+            userId,
+            portalId: options.portalId,
+        });
         if (!limitedAccount) {
             return this.setLimitedAccount(userId, options);
         }
@@ -491,7 +500,10 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
      * @param portalId portalId of the limited account to delete
      * @returns Deleted limited account
      */
-    public deleteLimitedAccount(userId: UserId, portalId: PortalId): LimitedAccount | null {
+    public deleteLimitedAccount(
+        userId: UserId,
+        portalId: PortalId
+    ): LimitedAccount | null {
         const limitedAccount = this.getLimitedAccount({ userId, portalId });
         if (!limitedAccount) return null;
         this.db
@@ -500,5 +512,17 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
             )
             .run(userId, portalId);
         return limitedAccount;
+    }
+
+    /**
+     * Get a Portal Message by its Discord Message id.
+     * @param messageId Id of the Discord message whose Portal Message is to be found
+     * @returns Portal Message
+     */
+    public getPortalMessage(messageId: MessageId): PortalMessage | null {
+        const portalMessageId = this.getPortalMessageId(messageId);
+        if (!portalMessageId) return null;
+        const portalMessages = this.getPortalMessages(portalMessageId);
+        return portalMessages.get(messageId) || null;
     }
 }
