@@ -122,7 +122,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
     /**
      * Get a Portal.
      * @param portalId Id of the Portal to get
-     * @returns Portal
+     * @returns Portal or null if not found
      */
     public getPortal(portalId: string): Portal | null {
         const portal = this.db
@@ -241,7 +241,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
     }
 
     /**
-     * Update a Portal Connection for a channel.
+     * Update a Portal Connection for a channel. Returns null if no Portal Connection exists for the channel.
      * @param channelId Id of the channel to update the portal connection for
      * @param portalConnectionOptions New options for the portal connection
      * @returns Updated Portal Connection
