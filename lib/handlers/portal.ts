@@ -113,7 +113,7 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
                     ? "(Click to see attachment 🖾)"
                     : originalReference.content.startsWith(
                           "`[Reply failed]`"
-                      ) || originalReference.content.startsWith("[[Reply to `")
+                      ) || originalReference.content.startsWith("[[Reply to ")
                     ? originalReference.content.split("\n").slice(1).join("\n")
                     : originalReference.content
             )
