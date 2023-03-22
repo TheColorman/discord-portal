@@ -190,23 +190,17 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
 
                 // Propegate replies through portal
                 const replyPing = await (async () => {
-                    console.log("A");
                     // Stop if no reference
                     if (!originalReference) return false;
-                    console.log("B");
                     // Stop if message is not a webhook
                     if (!helpers.isPortalWebhookMessage(originalReference))
                         return false;
-                    console.log("C");
-                    console.log(message.mentions.repliedUser);
                     // Stop if the reply didn't ping
                     //! Seems like there's no way to check whether the reply pings or not???
                     
-                    console.log("D");
                     // Stop if the local version of the reference is not the original source
                     if (localPortalReference?.messageType !== "original")
                         return false;
-                    console.log("E");
                     // Now we can add a ping to the reply
                     const localReferenceMessage =
                         await helpers.safeFetchMessage(
