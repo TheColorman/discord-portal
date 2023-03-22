@@ -456,7 +456,7 @@ client.on(Events.MessageCreate, async (message) => {
         });
     })();
 
-    if (message.content.startsWith(PREFIX)) {
+    if (message.content.startsWith(PREFIX) && !message.author.bot) {
         const args = message.content.slice(PREFIX.length).trim().split(/\s+/g);
         const command = args.shift()?.toLowerCase();
 
