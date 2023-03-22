@@ -214,7 +214,7 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
                 if (!localReferenceMessageId) return "`[Reply failed]`\n";
                 return (
                     "[[Reply to " +
-                    (replyPing || "`" + refAuthorTag + "`") +
+                    (replyPing || "`@" + refAuthorTag + "`") +
                     " - `" +
                     refPreview +
                     "`]](https://discord.com/channels/" +
