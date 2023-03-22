@@ -1,26 +1,8 @@
-import {
-    Client,
-    Events,
-    GatewayIntentBits,
-    ComponentType,
-    ButtonStyle,
-    TextInputStyle,
-    MessageReaction,
-    User,
-    Embed,
-    ChannelType,
-    ContextMenuCommandBuilder,
-    ApplicationCommandType,
-    Routes,
-    REST,
-    AttachmentBuilder,
-} from "discord.js";
+import { Client, Events, GatewayIntentBits } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
-import { PREFIX, ADMINS } from "./config.json";
 import DiscordHelpersCore from "./lib/helpers/discord_helpers.core";
 import { UserId } from "./lib/types";
-import * as fs from "fs";
 import {
     handlePortal,
     handleCommands,
@@ -55,14 +37,6 @@ Error.prepareStackTrace = (err, stack) => {
 };
 
 const token = process.env.TOKEN;
-
-// Config
-const portalIntro = {
-    portal: "**Welcome to the setup!** Select which Portal you want this channel to be connected to.",
-    askInvite:
-        "**Do you want to share an invite link to your server** with the Portal? You can always remove it by re-joining the Portal.",
-    confirm: `**Do you want to join this Portal?** You can also choose to share an invite to this server with the Portal. You can always leave using \`${PREFIX}leave\`.`,
-};
 
 // Database
 const db = sqlite3("./db.sqlite");
