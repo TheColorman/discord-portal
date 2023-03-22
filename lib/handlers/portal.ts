@@ -186,7 +186,7 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
                         linkedPortalMessage.channelId ===
                         portalConnection.channelId
                 );
-                const localPortalReferenceId = localPortalReference?.id;
+                const localReferenceMessageId = localPortalReference?.messageId;
 
                 // Propegate replies through portal
                 const replyPing = await (async () => {
@@ -211,7 +211,7 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
                     return `<@${localReferenceMessage.author.id}>`;
                 })();
 
-                if (!localPortalReferenceId) return "`[Reply failed]`\n";
+                if (!localReferenceMessageId) return "`[Reply failed]`\n";
                 return (
                     "[[Reply to " +
                     (replyPing || "`" + refAuthorTag + "`") +
@@ -222,7 +222,7 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
                     "/" +
                     localChannel.id +
                     "/" +
-                    localPortalReferenceId +
+                    localReferenceMessageId +
                     ")\n"
                 );
             };
