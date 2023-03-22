@@ -339,4 +339,13 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             channel.type === ChannelType.PrivateThread
         );
     }
+
+    /**
+     * Check if a Discord message is a guild message.
+     * @param message A Discord message
+     * @returns Whether the message is a guild message
+     */
+    public isGuildMessage(message: Message): message is Message<true> {
+        return !!message.guildId;
+    }
 }
