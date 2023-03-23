@@ -197,7 +197,7 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
                         return false;
                     // Stop if the reply didn't ping
                     //! Seems like there's no way to check whether the reply pings or not???
-                    
+
                     // Stop if the local version of the reference is not the original source
                     if (localPortalReference?.messageType !== "original")
                         return false;
@@ -226,7 +226,7 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
                     ")\n"
                 );
             };
-            newContent = await buildReply() + message.content;
+            newContent = (await buildReply()) + message.content;
         }
 
         // Get webhook
@@ -251,7 +251,10 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
             content: newContent.trim() ? newContent : attachments.shift()?.url,
             username:
                 username.length > 80 ? username.slice(0, 77) + "..." : username,
-            avatarURL: message.author.avatarURL() || undefined,
+            avatarURL:
+                message.member?.avatarURL() ||
+                message.author.avatarURL() ||
+                undefined,
             embeds: embeds,
             tts: message.tts,
             allowedMentions: {
