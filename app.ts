@@ -95,6 +95,12 @@ client.on(Events.MessageCreate, async (message) => {
     if (!helpers.isGuildMessage(message)) return;
     // Ignore if not ValidChannel
     if (!helpers.isValidChannel(message.channel)) return;
+    // Ignore if announcement from self
+    if (
+        message.content.startsWith("📢") &&
+        message.author.id === client.user?.id
+    )
+        return;
 
     // Portal functionality
     await handlePortal(message, helpers);
