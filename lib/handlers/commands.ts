@@ -417,6 +417,7 @@ async function handleCommands(
                 }
                 break;
             }
+            // TODO: Move these commands to dev
             case "limit": {
                 // Check if user is allowed to use this command
                 if (!ADMINS.includes(message.author.id)) break;
