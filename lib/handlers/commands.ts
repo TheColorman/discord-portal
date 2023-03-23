@@ -9,12 +9,34 @@ import {
 } from "discord.js";
 import { PREFIX, ADMINS } from "../../config.json";
 import DiscordHelpersCore from "../helpers/discord_helpers.core";
-import { UserId } from "../types";
+import { PortalConnection, UserId } from "../types";
 import { portalIntro } from "../const";
 import dotenv from "dotenv";
 
 dotenv.config();
 const token = process.env.TOKEN;
+
+async function announcePortalLeave(
+    portalConnection: PortalConnection,
+    helpers: DiscordHelpersCore
+) {
+    const sharedConnections = helpers.getPortalConnections(
+        portalConnection.portalId
+    );
+    sharedConnections.forEach(async (sharedConnection) => {
+        if (sharedConnection.channelId === portalConnection.channelId) return;
+        const channel = await helpers.safeFetchChannel(
+            sharedConnection.channelId
+        );
+        if (!channel) {
+            await helpers.deletePortalConnection(sharedConnection.channelId);
+            return;
+        }
+        channel.send({
+            content: `📢 **${portalConnection.guildName}** left the Portal 👋.`,
+        });
+    });
+}
 
 async function handleCommands(
     message: Message<true>,
@@ -261,6 +283,7 @@ async function handleCommands(
                 message.reply({
                     content: `Left Portal \`#${portalConnection.portalId}\` - ${portal.emoji}${portal.name}.`,
                 });
+                await announcePortalLeave(portalConnection, helpers);
                 break;
             }
             case "delete": {
