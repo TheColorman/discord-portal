@@ -33,7 +33,10 @@ async function announcePortalLeave(
             return;
         }
         channel.send({
-            content: `📢 **${portalConnection.guildName}** left the Portal 👋.`,
+            content: `📢 **${portalConnection.guildName.replace(
+                "**",
+                "\\*\\*"
+            )}** left the Portal 👋.`,
         });
     });
 }
@@ -74,6 +77,23 @@ async function handleCommands(
                 const portalConnections = helpers.getPortalConnections(
                     portalConnection.portalId
                 );
+
+                const portalString = portalConnections
+                    .map(
+                        (c) =>
+                            `• **${
+                                c.guildInvite
+                                    ? `[${c.guildName.replace(
+                                          "**",
+                                          "\\*\\*"
+                                      )}](<https://discord.gg/${
+                                          c.guildInvite
+                                      }>)`
+                                    : // Sanitize the guild name
+                                      c.guildName.replace("**", "\\*\\*")
+                            }** - #${c.channelName}`
+                    )
+                    .join("\n");
 
                 portalConnections.forEach(async (portalConnection) => {
                     const channel = await helpers.safeFetchChannel(
@@ -141,16 +161,7 @@ async function handleCommands(
                                 ? "\nPassword: ||" + portal.password + "||"
                                 : "") +
                             ".\nConnection shared with\n" +
-                            portalConnections
-                                .map(
-                                    (c) =>
-                                        `• **${
-                                            c.guildInvite
-                                                ? `[${c.guildName}](<https://discord.gg/${c.guildInvite}>)`
-                                                : c.guildName
-                                        }** - #${c.channelName}`
-                                )
-                                .join("\n") +
+                            portalString +
                             "\n[Invite me](https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275683605585&scope=bot)",
                         avatarURL: message.client.user.avatarURL() || "",
                         username:

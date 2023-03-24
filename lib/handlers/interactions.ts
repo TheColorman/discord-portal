@@ -25,7 +25,10 @@ async function announcePortalJoin(
         const channel = await helpers.safeFetchChannel(connection.channelId);
         if (!channel) return;
         channel.send({
-            content: `📢 **${portalConnection.guildName}** joined the Portal. Say hi!`,
+            content: `📢 **${portalConnection.guildName.replace(
+                "**",
+                "\\*\\*"
+            )}** joined the Portal. Say hi!`,
         });
     });
 }
