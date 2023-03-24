@@ -146,7 +146,7 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     );
 });
 
-// Channel updatesimage.pngfigure
+// Channel updates
 client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
     // Return if not a valid channel
     if (!helpers.isValidChannel(newChannel)) return;
