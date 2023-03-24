@@ -172,8 +172,16 @@ client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
 
 // Guild updates
 client.on(Events.GuildUpdate, (oldGuild, newGuild) => {
-
-})
+    // Check if guild has any portal connections
+    const portalConnections = helpers.getGuildPortalConnections(newGuild.id);
+    if (!portalConnections) return;
+    // Update portal connections
+    portalConnections.forEach((portalConnection) => {
+        helpers.updatePortalConnection(portalConnection.channelId, {
+            guildName: newGuild.name,
+        });
+    });
+});
 
 // Reactions
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
