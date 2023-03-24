@@ -70,3 +70,6 @@ export type SQlite3Bind = Number | String | BigInt | Buffer | null;
 export type PortalWebhookMessage = Message<true>;
 export type PortalSourceMessage = Message<true>;
 export type PortalDiscordMessage = PortalWebhookMessage | PortalSourceMessage;
+export type ValidMessage = Message & {
+    channel: ValidChannel;
+}
