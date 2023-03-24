@@ -135,7 +135,7 @@ client.on(Events.MessageDelete, async (message) => {
 });
 
 // Edit messages
-client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
+client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
     // Ignore webhook edits
     if (newMessage.webhookId) return;
 
@@ -169,6 +169,11 @@ client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
         //TODO: Not implemented
     }
 });
+
+// Guild updates
+client.on(Events.GuildUpdate, (oldGuild, newGuild) => {
+
+})
 
 // Reactions
 client.on(Events.MessageReactionAdd, async (reaction, user) => {
