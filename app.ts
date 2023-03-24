@@ -9,6 +9,7 @@ import {
     handleDeleteMessage,
     handleReact,
     handleInteraction,
+    handleMessageUpdate,
 } from "./lib/handlers";
 import fullSetup from "./lib/setup";
 dotenv.config();
@@ -113,6 +114,8 @@ client.on(Events.MessageCreate, async (message) => {
 client.on(Events.MessageDelete, async (message) => {
     // Ignore webhook deletions
     if (message.webhookId) return;
+   
+    await handleDeleteMessage(message, helpers);
 });
 
 // Edit messages
@@ -120,10 +123,10 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     // Ignore webhook edits
     if (newMessage.webhookId) return;
 
-    await handleDeleteMessage(newMessage, helpers);
+    await handleMessageUpdate(newMessage, helpers);
 });
 
-// Channel updates
+// Channel updatesimage.pngfigure
 client.on(Events.ChannelUpdate, (oldChannel, newChannel) => {
     // Return if not a valid channel
     if (!helpers.isValidChannel(newChannel)) return;
