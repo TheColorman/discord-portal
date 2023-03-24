@@ -1,12 +1,10 @@
-import {
-    Interaction,
-    Sticker,
-} from "discord.js";
+import { Interaction, Sticker } from "discord.js";
 import * as fs from "fs";
 import fetch from "node-fetch";
 import ffmpeg from "fluent-ffmpeg";
 import { MAX_STICKERS_ON_DISK } from "../../config.json";
 import { emojiSuggestions, nameSuggestions } from "../const";
+import { MessageEvent, Queue } from "../messageEventClasses";
 
 export default class BaseHelpersCore {
     /**
@@ -148,5 +146,29 @@ export default class BaseHelpersCore {
             console.error(err);
         }
         return stickerPath;
+    }
+
+    /**
+     * Enqueue a message event.
+     * This is used to prevent situations such as a message being edited before it has been sent out to the Portal.
+     * Any function that depends on PortalMessages existing should use this.
+     * @param messageEvent Message event to enqueue
+     */
+    public async enqueueMessageEvent(messageEvent: MessageEvent) {
+        // Get event queue for this message
+        const messageEventQueue =
+            messageEvent.queue() || new Queue<MessageEvent>();
+
+        // Create new event
+        const isEmpty = messageEventQueue.isEmpty();
+        messageEventQueue.enqueue(messageEvent);
+        // Set event queue on map
+        const messageEventQueueMap = messageEvent.queueMap();
+        messageEventQueueMap.set(messageEvent.id, messageEventQueue);
+
+        // If queue is empty, run manually
+        if (isEmpty) {
+            await messageEvent.call();
+        }
     }
 }

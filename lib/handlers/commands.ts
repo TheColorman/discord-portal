@@ -101,15 +101,6 @@ async function handleCommands(
                     let portalMessageId = helpers.getPortalMessageId(
                         message.id
                     );
-                    if (!portalMessageId) {
-                        // Wait 1s and try again
-                        await new Promise((resolve) =>
-                            setTimeout(resolve, 1000)
-                        );
-                        portalMessageId = helpers.getPortalMessageId(
-                            message.id
-                        );
-                    }
 
                     const replyId =
                         portalConnection.channelId === message.channel.id

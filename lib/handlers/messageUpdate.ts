@@ -2,39 +2,49 @@ import { Message, PartialMessage } from "discord.js";
 import DiscordHelpersCore from "../helpers/discord_helpers.core";
 
 async function handleMessageUpdate(
-    message: Message | PartialMessage,
+    newMessage: Message | PartialMessage,
     helpers: DiscordHelpersCore
 ) {
     // Check if message is a portal message
-    const portalMessageId = helpers.getPortalMessageId(message.id);
+    const portalMessageId = helpers.getPortalMessageId(newMessage.id);
     if (!portalMessageId) return;
     const portalMessages = helpers.getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
     // Edit linked messages
-    for (const [messageId, portalMessage] of portalMessages) {
-        // Find channel and message objects
-        const channel = await helpers.safeFetchChannel(portalMessage.channelId);
-        if (!channel) continue;
-        const message = await helpers.safeFetchMessage(
-            channel,
-            portalMessage.messageId
-        );
-        if (!message) continue;
+    const promises: Promise<void>[] = [];
 
-        // Attempt to edit message
-        await helpers.editMessage(channel, portalMessage.messageId, {
-            content: message.content,
-            // files: message.attachments.map((a) => ({
-            //     attachment: a.url,
-            //     name: a.name || undefined,
-            // })),
-            embeds: message.embeds,
-            allowedMentions: {
-                parse: ["users"],
-            },
-        });
-    }
+    portalMessages.forEach((portalMessage) => {
+        promises.push(
+            (async () => {
+                // Find channel and message objects
+                const channel = await helpers.safeFetchChannel(
+                    portalMessage.channelId
+                );
+                if (!channel) return;
+                const message = await helpers.safeFetchMessage(
+                    channel,
+                    portalMessage.messageId
+                );
+                if (!message) return;
+
+                // Attempt to edit message
+                await helpers.editMessage(channel, portalMessage.messageId, {
+                    content: newMessage.content,
+                    // files: message.attachments.map((a) => ({
+                    //     attachment: a.url,
+                    //     name: a.name || undefined,
+                    // })),
+                    embeds: newMessage.embeds,
+                    allowedMentions: {
+                        parse: ["users"],
+                    },
+                });
+            })()
+        );
+    });
+
+    await Promise.all(promises);
 }
 
 export default handleMessageUpdate;

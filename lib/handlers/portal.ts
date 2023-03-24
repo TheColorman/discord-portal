@@ -135,14 +135,6 @@ async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
             originalReference.id
         );
 
-        if (!referencePortalMessageId) {
-            // Try again after 1s
-            await new Promise((resolve) => setTimeout(resolve, 1000));
-            referencePortalMessageId = helpers.getPortalMessageId(
-                originalReference.id
-            );
-        }
-
         if (!referencePortalMessageId) return failed;
         const linkedPortalMessages = helpers.getPortalMessages(
             referencePortalMessageId

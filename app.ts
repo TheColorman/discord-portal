@@ -2,7 +2,7 @@ import { Client, Events, GatewayIntentBits } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
 import DiscordHelpersCore from "./lib/helpers/discord_helpers.core";
-import { UserId } from "./lib/types";
+import { MessageId, UserId } from "./lib/types";
 import {
     handlePortal,
     handleCommands,
@@ -12,6 +12,7 @@ import {
     handleMessageUpdate,
 } from "./lib/handlers";
 import fullSetup from "./lib/setup";
+import { MessageEvent, Queue } from "./lib/messageEventClasses";
 dotenv.config();
 
 Error.stackTraceLimit = Infinity; //! Remove in production
@@ -84,6 +85,9 @@ const portalSetups = new Map<
     }
 >();
 
+// Enqueue message operations to make sure we don't edit before the webhook has sent
+const messageEventQueueMap = new Map<MessageId, Queue<MessageEvent>>();
+
 client.once(Events.ClientReady, (c) => {
     console.log(`Ready! Logged in as ${c.user?.tag}`);
 });
@@ -104,18 +108,30 @@ client.on(Events.MessageCreate, async (message) => {
         return;
 
     // Portal functionality
-    await handlePortal(message, helpers);
+    helpers.enqueueMessageEvent(
+        new MessageEvent(message.id, messageEventQueueMap, async () => {
+            await handlePortal(message, helpers);
+        })
+    );
 
     // Commands
-    await handleCommands(message, helpers, connectionSetups);
+    helpers.enqueueMessageEvent(
+        new MessageEvent(message.id, messageEventQueueMap, async () => {
+            await handleCommands(message, helpers, connectionSetups);
+        })
+    );
 });
 
 // Delete messages
 client.on(Events.MessageDelete, async (message) => {
     // Ignore webhook deletions
     if (message.webhookId) return;
-   
-    await handleDeleteMessage(message, helpers);
+
+    helpers.enqueueMessageEvent(
+        new MessageEvent(message.id, messageEventQueueMap, async () => {
+            await handleDeleteMessage(message, helpers);
+        })
+    );
 });
 
 // Edit messages
@@ -123,7 +139,11 @@ client.on(Events.MessageUpdate, async (_oldMessage, newMessage) => {
     // Ignore webhook edits
     if (newMessage.webhookId) return;
 
-    await handleMessageUpdate(newMessage, helpers);
+    helpers.enqueueMessageEvent(
+        new MessageEvent(newMessage.id, messageEventQueueMap, async () => {
+            await handleMessageUpdate(newMessage, helpers);
+        })
+    );
 });
 
 // Channel updatesimage.pngfigure
