@@ -1,5 +1,4 @@
 // ⚠ This is horrible
-
 import {
     ButtonStyle,
     CacheType,
@@ -12,7 +11,7 @@ import {
 import DiscordHelpersCore from "../helpers/discord_helpers.core";
 import { PortalConnection, UserId } from "../types";
 import { portalIntro } from "../const";
-import { ADMINS } from "../../config.json";
+import { ADMINS, PREFIX } from "../../config.json";
 
 async function announcePortalJoin(
     portalConnection: PortalConnection,
@@ -573,7 +572,9 @@ async function handleInteraction(
                         portalConnection.portalId
                     }\` - ${portal.emoji}${portal.name}${
                         portal.nsfw ? "🔞" : ""
-                    }${portal.exclusive ? "🔒" : ""}.`,
+                    }${
+                        portal.exclusive ? "🔒" : ""
+                    }.\n(You can always leave the Portal with \`${PREFIX}leave\`, or delete it using \`${PREFIX}delete\`.)`,
                     components: [],
                 });
                 break;
