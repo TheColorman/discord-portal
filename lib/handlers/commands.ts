@@ -479,7 +479,15 @@ async function handleCommands(
                         break;
                     }
                     case "ban": {
-                        const user = message.mentions.users.first();
+                        const userText =
+                            message.content.match(/<@!?(\d+)>/)?.[1];
+                        if (!userText) {
+                            message.reply({
+                                content: "Please mention a user to limit.",
+                            });
+                            break;
+                        }
+                        const user = await message.client.users.fetch(userText);
                         if (!user) {
                             message.reply({
                                 content: "Please mention a user to limit.",
