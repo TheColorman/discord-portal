@@ -970,7 +970,13 @@ async function handleInteraction(
                 const portalId = helpers.getPortalConnection(
                     interaction.channel.id
                 )?.portalId;
-                if (!portalId) return;
+                if (!portalId) {
+                    interaction.reply({
+                        content: "You are not in a Portal channel.",
+                        ephemeral: true,
+                    });
+                    return;
+                }
                 helpers.setLimitedAccount(user.id, {
                     portalId,
                     channelId: interaction.channel.id,
@@ -997,7 +1003,13 @@ async function handleInteraction(
                 const portalId = helpers.getPortalConnection(
                     interaction.channel.id
                 )?.portalId;
-                if (!portalId) return;
+                if (!portalId) {
+                    interaction.reply({
+                        content: "You are not in a Portal channel.",
+                        ephemeral: true,
+                    });
+                    return;
+                }
                 helpers.deleteLimitedAccount(user.id, portalId);
 
                 // Remove permissions in all channels
@@ -1032,7 +1044,13 @@ async function handleInteraction(
                 const portalId = helpers.getPortalConnection(
                     interaction.channel.id
                 )?.portalId;
-                if (!portalId) return;
+                if (!portalId) {
+                    interaction.reply({
+                        content: "You are not in a Portal channel.",
+                        ephemeral: true,
+                    });
+                    return;
+                }
                 helpers.setLimitedAccount(user.id, {
                     portalId,
                     channelId: interaction.channel.id,
