@@ -416,7 +416,7 @@ async function handleCommands(
                         }
                         break;
                     }
-                    case "limit": {        
+                    case "limit": {
                         const member = message.mentions.members?.first();
                         if (!member) {
                             message.reply({
@@ -440,7 +440,7 @@ async function handleCommands(
                         });
                         break;
                     }
-                    case "unban": {       
+                    case "unban": {
                         const member = message.mentions.members?.first();
                         if (!member) {
                             message.reply({
@@ -453,15 +453,22 @@ async function handleCommands(
                         )?.portalId;
                         if (!portalId) return;
                         helpers.deleteLimitedAccount(member.id, portalId);
-        
+
                         // Remove permissions in all channels
                         const portalConnections =
                             helpers.getPortalConnections(portalId);
-                        for (const [channelId, portalConnection] of portalConnections) {
-                            const channel = await helpers.safeFetchChannel(channelId);
+                        for (const [
+                            channelId,
+                            portalConnection,
+                        ] of portalConnections) {
+                            const channel = await helpers.safeFetchChannel(
+                                channelId
+                            );
                             if (!channel) continue;
                             try {
-                                await channel.permissionOverwrites.delete(member);
+                                await channel.permissionOverwrites.delete(
+                                    member
+                                );
                             } catch (e) {
                                 // console.error(e);
                             }
@@ -472,8 +479,8 @@ async function handleCommands(
                         break;
                     }
                     case "ban": {
-                        const member = message.mentions.members?.first();
-                        if (!member) {
+                        const user = message.mentions.users.first();
+                        if (!user) {
                             message.reply({
                                 content: "Please mention a user to limit.",
                             });
@@ -483,18 +490,18 @@ async function handleCommands(
                             message.channel.id
                         )?.portalId;
                         if (!portalId) return;
-                        helpers.setLimitedAccount(member.id, {
+                        helpers.setLimitedAccount(user.id, {
                             portalId,
                             channelId: message.channel.id,
                             banned: true,
-                            bot: member.user.bot,
+                            bot: user.bot,
                             reason: "Manual block",
                         });
                         message.reply({
-                            content: `${message.author} banned ${member.user.tag} in this channel.`,
+                            content: `${message.author} banned ${user.tag} in this channel.`,
                         });
                         break;
-                    }        
+                    }
                 }
                 break;
             }
