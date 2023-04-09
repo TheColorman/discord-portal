@@ -18,8 +18,13 @@ import {
 import DatabaseHelpersCore from "./database_helpers.core";
 import { Database } from "better-sqlite3";
 import {
+    AttachmentId,
+    ChannelId,
     DiscordChannel,
     PortalConnection,
+    PortalId,
+    PortalMessage,
+    PortalMessageId,
     PortalSourceMessage,
     PortalWebhookMessage,
     ValidChannel,
@@ -171,7 +176,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 webhookId: portalConnection?.webhookId,
             });
             if (!webhook) throw Error("No webhook found.");
-            await webhook.deleteMessage(messageId);
+            await webhook.deleteMessage(message);
 
             return message;
         } catch (err) {
@@ -239,7 +244,13 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             channel = fetchedChannel;
         }
 
-        if (!webhookId) return this.createWebhook(channel);
+        if (!webhookId) {
+            // Check if we already have a webhook for this channel
+            const portalWebhokook = (await channel.fetchWebhooks()).find(
+                (wh) => wh.applicationId === this.client.user?.id
+            );
+            return portalWebhokook || this.createWebhook(channel);
+        }
         const webhook = (await channel.fetchWebhooks()).get(webhookId);
         if (!webhook) {
             const webhook = await this.createWebhook(channel);
