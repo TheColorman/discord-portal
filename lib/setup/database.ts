@@ -4,7 +4,9 @@ function setupDatabase(db: BetterSqlite3.Database) {
     // Create tables
     console.log("Creating tables...");
     // Run this once for previous installations
-    // db.prepare(`DROP TABLE IF EXISTS limitedAccounts`).run();
+    // Update portalMessages table to add attachmentId column
+    // db.prepare(`ALTER TABLE portalMessages ADD COLUMN attachmentId TEXT DEFAULT ''`).run();
+
     db.prepare(
         // For Portals
         `CREATE TABLE IF NOT EXISTS portals (id TEXT PRIMARY KEY, name TEXT, emoji TEXT, customEmoji INTEGER DEFAULT 0, nsfw INTEGER DEFAULT 0, private INTEGER DEFAULT 0, password TEXT)`
@@ -31,6 +33,7 @@ function setupDatabase(db: BetterSqlite3.Database) {
         messageId TEXT, 
         channelId TEXT,
         messageType TEXT,
+        attachmentId TEXT DEFAULT '',
         FOREIGN KEY(portalId) REFERENCES portals(id)
     )` // messageType is one of "original" | "linked" | "linkedAttachment"
     ).run();

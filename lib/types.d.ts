@@ -40,6 +40,7 @@ export type PortalMessage = {
     messageId: string;
     channelId: string;
     messageType: MessageType;
+    attachmentId?: string;
 };
 export type LimitedAccount = {
     userId: string;
@@ -54,6 +55,7 @@ export type ChannelId = string;
 export type MessageId = string;
 export type UserId = string;
 export type PortalMessageId = string;
+export type AttachmentId = string;
 export type MessageType = "original" | "linked" | "linkedAttachment";
 export type Permissions = BitFieldResolvable<S, N>[];
 export type ValidChannel = TextChannel | NewsChannel;
@@ -72,4 +74,4 @@ export type PortalSourceMessage = Message<true>;
 export type PortalDiscordMessage = PortalWebhookMessage | PortalSourceMessage;
 export type ValidMessage = Message & {
     channel: ValidChannel;
-}
+};
