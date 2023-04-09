@@ -13,6 +13,7 @@ import {
     UserId,
     LimitedAccount,
     SQlite3Bind,
+    AttachmentId,
 } from "../types";
 import { Collection } from "discord.js";
 
@@ -291,25 +292,35 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
         messageId,
         channelId,
         messageType,
+        attachmentId,
     }: {
         id: PortalMessageId;
         portalId: PortalId;
         messageId: MessageId;
         channelId: ChannelId;
         messageType: MessageType;
+        attachmentId?: AttachmentId;
     }): PortalMessage {
         // Note: Make sure id is the same for all linked messages
         this.db
             .prepare(
-                "INSERT INTO portalMessages (id, portalId, messageId, channelId, messageType) VALUES (?, ?, ?, ?, ?)"
+                "INSERT INTO portalMessages (id, portalId, messageId, channelId, messageType, attachmentId) VALUES (?, ?, ?, ?, ?, ?)"
             )
-            .run([id, portalId, messageId, channelId, messageType]);
+            .run([
+                id,
+                portalId,
+                messageId,
+                channelId,
+                messageType,
+                attachmentId || "",
+            ]);
         return {
             id,
             portalId,
             messageId,
             channelId,
             messageType,
+            attachmentId,
         };
     }
 
@@ -347,6 +358,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
                     messageId: portalMessage.messageId,
                     channelId: portalMessage.channelId,
                     messageType: portalMessage.messageType,
+                    attachmentId: portalMessage.attachmentId,
                 },
             ])
         );

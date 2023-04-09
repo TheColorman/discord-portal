@@ -1,14 +1,19 @@
 import {
+    Attachment,
     ChannelType,
     Client,
+    Collection,
     GuildEmoji,
     Invite,
     Message,
+    MessageCreateOptions,
+    MessageEditOptions,
     MessagePayload,
     PermissionFlagsBits,
     ReactionEmoji,
     Webhook,
-    WebhookEditMessageOptions,
+    WebhookMessageCreateOptions,
+    WebhookMessageEditOptions,
 } from "discord.js";
 import DatabaseHelpersCore from "./database_helpers.core";
 import { Database } from "better-sqlite3";
@@ -119,7 +124,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
     public async editMessage(
         channel: ValidChannel,
         messageId: string,
-        options: string | MessagePayload | WebhookEditMessageOptions
+        options: string | MessagePayload | WebhookMessageEditOptions
     ): Promise<Error | Message<boolean> | null> {
         const portalConnection = this.getPortalConnection(channel.id);
         if (!portalConnection) return Error("No Portal connection found.");
@@ -142,16 +147,22 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
     /**
      * Attempt to delete a Discord message without throwing an error.
      * @param channel Discord channel
-     * @param messageId Id of the message to delete
+     * @param message Id of the message to delete
      * @returns The deleted message if successful, an Error object otherwise
      */
     public async deleteMessage(
         channel: ValidChannel,
-        messageId: string
-    ): Promise<Error | Message<true> | null> {
+        message: string | Message
+    ): Promise<Error | Message | null> {
         // Fetch message
-        const message = await this.safeFetchMessage(channel, messageId);
-        if (!message) return null;
+        if (typeof message === "string") {
+            const fetchedMessage = await this.safeFetchMessage(
+                channel,
+                message
+            );
+            if (!fetchedMessage) return null;
+            message = fetchedMessage;
+        }
         try {
             // Attempt deletion using webhook
             const portalConnection = this.getPortalConnection(channel.id);
@@ -380,5 +391,587 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             portalMessage?.messageType === "linked" ||
             portalMessage?.messageType === "linkedAttachment"
         );
+    }
+    public async sendMessageToPortalAsBot({
+        portalId,
+        sourceChannelId,
+        options,
+        replyToPortalMessageId,
+    }: {
+        portalId: PortalId;
+        sourceChannelId: ChannelId;
+        options:
+            | string
+            | MessagePayload
+            | MessageCreateOptions
+            | (({
+                  portalConnection,
+                  channel,
+              }: {
+                  portalConnection: PortalConnection;
+                  channel: ValidChannel;
+              }) =>
+                  | Promise<string | MessagePayload | MessageCreateOptions>
+                  | string
+                  | MessagePayload
+                  | MessageCreateOptions);
+        replyToPortalMessageId?: PortalMessageId;
+    }) {
+        const portalConnections = this.getPortalConnections(portalId);
+        if (!portalConnections.size)
+            return new Error("No Portal connections found");
+
+        // Generate a unique portal message id
+        const portalMessageId = this.generatePortalMessageId();
+
+        // Send all messages
+        const promises = portalConnections.map(async (portalConnection) => {
+            const channel = await this.safeFetchChannel(
+                portalConnection.channelId
+            );
+            if (!channel) {
+                this.deletePortalConnection(portalConnection.channelId);
+                return;
+            }
+
+            // Get message content
+            const content =
+                typeof options === "function"
+                    ? await options({
+                          portalConnection,
+                          channel,
+                      })
+                    : options;
+
+            // Get replyTo message
+            const replyToMessage = await (() => {
+                if (!replyToPortalMessageId) return undefined;
+                const replyToPortalMessages = this.getPortalMessages(
+                    replyToPortalMessageId
+                );
+                if (!replyToPortalMessages) return undefined;
+                const replyToPortalMessage = replyToPortalMessages.find(
+                    (pm) =>
+                        pm.channelId === portalConnection.channelId &&
+                        pm.messageType !== "linkedAttachment"
+                );
+                if (!replyToPortalMessage) return undefined;
+                return this.safeFetchMessage(
+                    channel,
+                    replyToPortalMessage.messageId
+                );
+            })();
+
+            // Send message
+            const sent = replyToMessage
+                ? await replyToMessage.reply(content)
+                : await channel.send(content);
+            // Add portal message
+            this.createPortalMessage({
+                id: portalMessageId,
+                portalId,
+                messageId: sent.id,
+                channelId: portalConnection.channelId,
+                messageType:
+                    portalConnection.channelId === sourceChannelId
+                        ? "original"
+                        : "linked",
+            });
+        });
+
+        // Wait for all messages to be sent
+        await Promise.all(promises);
+
+        return portalMessageId;
+    }
+
+    /**
+     * Sends a single message as Webhook to a channel.
+     * @param param0
+     * @returns
+     */
+    public async sendMessageAsWebhook({
+        channel,
+        options,
+        portalConnection,
+    }: {
+        channel: string | ValidChannel;
+        options: WebhookMessageCreateOptions;
+        portalConnection?: PortalConnection;
+    }) {
+        const webhook = await this.getWebhook({
+            channel,
+            webhookId: portalConnection?.webhookId,
+        });
+        if (!webhook) return new Error("Failed to get webhook");
+
+        const sent = await webhook.send(options);
+        if (!sent) return new Error("Failed to send message");
+
+        return sent;
+    }
+
+    /**
+     * Sends a message as Webhook to all channels connected to a Portal.
+     * @param portalId ID of the Portal
+     * @param source Channel where this message originates
+     * @param options Either message options, or a function that returns message options.
+     * The function is passed an object containing the PortalConnection and channel of the given portal connection.
+     * @param portalReferenceId ID of the PortalMessage to reply to, if any
+     * @returns An Error object if an error occurs, the generated PortalMessage id otherwise
+     */
+    public async sendMessageToPortalAsWebhook({
+        portalId,
+        sourceChannelId,
+        options,
+        portalReferenceId,
+    }: {
+        portalId: PortalId;
+        sourceChannelId: ChannelId;
+        options:
+            | WebhookMessageCreateOptions
+            | ((
+                  portalConnection: PortalConnection
+              ) =>
+                  | Promise<WebhookMessageCreateOptions>
+                  | WebhookMessageCreateOptions);
+        portalReferenceId?: PortalMessageId;
+    }) {
+        const portalConnections = this.getPortalConnections(portalId);
+        if (!portalConnections.size)
+            return new Error("No Portal connections found");
+
+        const sourcePortalConnection = portalConnections.find(
+            (pc) => pc.channelId === sourceChannelId
+        );
+
+        // Generate a unique portal message id
+        const portalMessageId = this.generatePortalMessageId();
+
+        // Send all messages
+        const promises = portalConnections.map(async (portalConnection) => {
+            // Get reference
+            const localPortalReference = (() => {
+                if (!portalReferenceId) return undefined;
+                // Get all portal messages with the given id
+                const portalReferences =
+                    this.getPortalMessages(portalReferenceId);
+                if (!portalReferences) return undefined;
+                // Get local portal reference in this channel
+                const localPortalReference = portalReferences.find(
+                    (pm) =>
+                        pm.channelId === portalConnection.channelId &&
+                        pm.messageType !== "linkedAttachment"
+                );
+                if (!localPortalReference) return undefined;
+                return localPortalReference;
+            })();
+
+            // Get message content
+            const content =
+                typeof options === "function"
+                    ? await options(portalConnection)
+                    : options;
+            const formatted = localPortalReference
+                ? await this.formatWebhookReply({
+                      options: content,
+                      portalMessage: localPortalReference,
+                  })
+                : content;
+
+            // Add avatar and username, if not already set in options
+            const webhookOptions: WebhookMessageCreateOptions = Object.assign(
+                {
+                    avatarURL: this.client.user?.avatarURL() || "",
+                    username:
+                        portalConnection.channelId === sourceChannelId
+                            ? this.client.user?.username || "Portal"
+                            : `${this.client.user?.username || "Portal"} @ ${
+                                  sourcePortalConnection?.guildName || ""
+                              }`,
+                },
+                formatted
+            );
+
+            // Send message
+            const sent = await this.sendMessageAsWebhook({
+                channel: portalConnection.channelId,
+                options: webhookOptions,
+                portalConnection,
+            });
+            if (sent instanceof Error) return sent;
+
+            // Add portal message
+            this.createPortalMessage({
+                id: portalMessageId as PortalMessageId,
+                portalId,
+                messageId: sent.id,
+                channelId: portalConnection.channelId,
+                messageType:
+                    portalConnection.channelId === sourceChannelId
+                        ? "original"
+                        : "linked",
+            });
+        });
+
+        await Promise.all(promises);
+
+        return portalMessageId;
+    }
+
+    /**
+     * Propegates a message from to the entire Portal
+     * @param param0 Options
+     * @returns An Error object if an error occurs, the generated PortalMessage id otherwise
+     */
+    public async propegatePortalMessage({
+        portalId,
+        message,
+        options,
+        attachments,
+    }: {
+        portalId: PortalId;
+        message: ValidMessage;
+        options: WebhookMessageCreateOptions;
+        attachments?: Collection<AttachmentId, Attachment>;
+    }) {
+        const portalConnections = this.getPortalConnections(portalId);
+        if (!portalConnections.size)
+            return new Error("No Portal connections found");
+
+        // Generate a unique portal message id
+        const portalMessageId = this.generatePortalMessageId();
+
+        // Add original message to database
+        this.createPortalMessage({
+            id: portalMessageId,
+            portalId,
+            messageId: message.id,
+            channelId: message.channelId,
+            messageType: "original",
+        });
+
+        // Generate messages
+        const promises = portalConnections.map(async (portalConnection) => {
+            // Skip if portal connection is the source
+            if (portalConnection.channelId === message.channelId) return;
+
+            // Get channel
+            const channel = await this.safeFetchChannel(
+                portalConnection.channelId
+            );
+            if (!channel) return;
+
+            // Get reference
+            const localPortalReference = (() => {
+                if (!(message.reference && message.reference.messageId))
+                    return undefined;
+                // Get portal message with reference id
+                const sourcePortalReference = this.getPortalMessage(
+                    message.reference.messageId
+                );
+                if (!sourcePortalReference) return undefined;
+                // Get all portal messages with the same portal message id
+                const portalReferences = this.getPortalMessages(
+                    sourcePortalReference.id
+                );
+                // Get local portal reference in this channel
+                const localPortalReference = portalReferences.find(
+                    (pm) =>
+                        pm.channelId === portalConnection.channelId &&
+                        pm.messageType !== "linkedAttachment"
+                );
+                if (!localPortalReference) return undefined;
+                return localPortalReference;
+            })();
+
+            // Get message content
+            const content = localPortalReference
+                ? await this.formatWebhookReply({
+                      options,
+                      portalMessage: localPortalReference,
+                  })
+                : options;
+            // Merge message content with options
+
+            // Send message
+            const sent = await this.sendMessageAsWebhook({
+                channel,
+                options: content,
+                portalConnection: portalConnection,
+            });
+            if (sent instanceof Error) return sent;
+
+            // Add linked message to database
+            this.createPortalMessage({
+                channelId: portalConnection.channelId,
+                id: portalMessageId,
+                messageId: sent.id,
+                messageType: "linked",
+                portalId,
+            });
+
+            // Send attachments
+            for (const [attachmentId, attachment] of attachments || []) {
+                const sentAttachment = await this.sendMessageAsWebhook({
+                    channel,
+                    options: {
+                        content: attachment.url,
+                        username: options.username,
+                        avatarURL: options.avatarURL,
+                        allowedMentions: options.allowedMentions,
+                    },
+                    portalConnection,
+                });
+                if (sentAttachment instanceof Error) return sentAttachment;
+
+                // Add linked attachment to database
+                this.createPortalMessage({
+                    channelId: portalConnection.channelId,
+                    id: portalMessageId,
+                    messageId: sentAttachment.id,
+                    messageType: "linkedAttachment",
+                    portalId,
+                    attachmentId: attachmentId,
+                });
+            }
+        });
+
+        // Wait for all messages to be sent
+        await Promise.all(promises);
+
+        return portalMessageId;
+    }
+
+    /**
+     * Formats the content of a message sent as Webhook reply by adding "reply" line.
+     * @param param0 Message options and PortalMessage to reply to
+     * @returns Formatted message options
+     */
+    public async formatWebhookReply({
+        options,
+        portalMessage,
+    }: {
+        options: WebhookMessageCreateOptions;
+        portalMessage: PortalMessage;
+    }): Promise<WebhookMessageCreateOptions> {
+        const prepend =
+            (await (async () => {
+                // Fetch necessary data
+                const channel = await this.safeFetchChannel(
+                    portalMessage.channelId
+                );
+                if (!channel) return undefined;
+
+                const message = await this.safeFetchMessage(
+                    channel,
+                    portalMessage.messageId
+                );
+                if (!message) return undefined;
+                const originalPortalMessage = this.getPortalMessages(
+                    portalMessage.id
+                ).find((pm) => pm.messageType === "original");
+                if (!originalPortalMessage) return undefined;
+                const originalMessageChannel = await this.safeFetchChannel(
+                    originalPortalMessage.channelId
+                );
+                if (!originalMessageChannel) return undefined;
+                const originalMessage = await this.safeFetchMessage(
+                    originalMessageChannel,
+                    originalPortalMessage.messageId
+                );
+
+                // Format reply
+                const authorTag = originalMessage?.author?.tag || "Unknown";
+                // Remove first line from message content if it contains reply text
+                if (
+                    message.content.startsWith("[[Reply to") ||
+                    message.content.startsWith("`[Reply failed]`") ||
+                    message.content.startsWith("(Click to see attachment 🖾)")
+                ) {
+                    message.content = message.content
+                        .split("\n")
+                        .slice(1)
+                        .join("\n");
+                }
+                let referenceContent =
+                    // Check if message is attachment
+                    message.embeds.length
+                        ? "(Click to see attachment 🖾)"
+                        : message.content
+                              .replace(/\n/g, " ")
+                              // Replace <@id> with @username
+                              .replace(/<@!?([0-9]+)>/g, (_, id) => {
+                                  const user =
+                                      message.client.users.cache.get(id);
+                                  if (!user) return "@Unknown";
+                                  return `@${user.username}`;
+                              });
+                if (referenceContent.length > 50 - authorTag.length)
+                    referenceContent =
+                        referenceContent.substring(0, 50 - authorTag.length) +
+                        "...";
+                const guildId = message.guildId;
+                const channelId = message.channelId;
+                const messageId = message.id;
+
+                return (
+                    "[[Reply to " +
+                    (originalMessage?.channelId === channelId
+                        ? originalMessage.author?.toString()
+                        : "`@" + authorTag + "`") +
+                    " - `" +
+                    referenceContent +
+                    "`]]" +
+                    "(<https://discord.com/channels/" +
+                    guildId +
+                    "/" +
+                    channelId +
+                    "/" +
+                    messageId +
+                    ">)"
+                );
+            })()) || "`[Reply failed]`";
+
+        return {
+            ...options,
+            content: prepend + "\n" + (options.content || ""),
+        };
+    }
+
+    /**
+     * Edits a message sent to a Portal as Bot.
+     * @param param0 PortalMessageId and message options
+     */
+    public async editMessageAsBot({
+        portalMessageId,
+        options,
+    }: {
+        portalMessageId: PortalMessageId;
+        options:
+            | string
+            | MessagePayload
+            | MessageEditOptions
+            | ((
+                  message: Message
+              ) =>
+                  | Promise<string | MessagePayload | MessageEditOptions>
+                  | string
+                  | MessagePayload
+                  | MessageEditOptions);
+    }) {
+        const portalMessages = this.getPortalMessages(portalMessageId);
+        if (!portalMessages) return;
+
+        const promises = portalMessages.map(async (portalMessage) => {
+            const channel = await this.safeFetchChannel(
+                portalMessage.channelId
+            );
+            if (!channel) return;
+
+            const message = await this.safeFetchMessage(
+                channel,
+                portalMessage.messageId
+            );
+            if (!message) return;
+
+            const messageEditOptions =
+                typeof options === "function"
+                    ? await options(message)
+                    : options;
+
+            await message.edit(messageEditOptions);
+        });
+
+        await Promise.all(promises);
+    }
+
+    public async updatePortalMessageAsWebhook({
+        portalMessageId,
+        options,
+    }: {
+        portalMessageId: PortalMessageId;
+        options:
+            | WebhookMessageEditOptions
+            | ((
+                  message: Message
+              ) =>
+                  | Promise<WebhookMessageEditOptions>
+                  | WebhookMessageEditOptions);
+    }) {
+        const portalMessages = this.getPortalMessages(portalMessageId)?.filter(
+            (pm) => pm.messageType === "linked"
+        );
+        if (!portalMessages) return;
+
+        const promises = portalMessages.map(async (portalMessage) => {
+            const webhook = await this.getWebhook({
+                channel: portalMessage.channelId,
+            });
+            if (!webhook) return;
+
+            const message = await webhook.fetchMessage(portalMessage.messageId);
+
+            if (typeof options === "function") {
+                options = await options(message);
+            }
+
+            // We want to keep the first line of the original message content, if it is a reply to another message
+            if (
+                message.content.startsWith("[[Reply to `@") ||
+                message.content.startsWith("`[Reply failed]`")
+            ) {
+                const firstLine = message.content.split("\n")[0];
+                options.content = firstLine + "\n" + options.content;
+            }
+
+            await webhook.editMessage(portalMessage.messageId, options);
+        });
+
+        await Promise.all(promises);
+    }
+
+    public async updatePortalMessage({
+        sourceMessage,
+        options,
+    }: {
+        sourceMessage: ValidMessage;
+        options: WebhookMessageEditOptions;
+    }) {
+        // Get portal message id
+        const portalMessageId = this.getPortalMessageId(sourceMessage.id);
+        if (!portalMessageId) return new Error("No portal message found");
+
+        // Update portal messages
+        await this.updatePortalMessageAsWebhook({
+            portalMessageId,
+            options,
+        });
+
+        // return;
+        // Update attachments
+        // /i\ The only update an attachment can receive is a removal.
+        // So the only thing we need to do is remove any attachments that aren't in the new list.
+        const portalMessages = this.getPortalMessages(portalMessageId);
+        const oldAttachments = portalMessages.filter(
+            (pm) => pm.messageType === "linkedAttachment"
+        );
+        const newAttachments = sourceMessage.attachments.map((a) => a.id);
+
+        const promises = oldAttachments.map(async (pm) => {
+            if (!pm.attachmentId || newAttachments.includes(pm.attachmentId))
+                return;
+
+            // Fetch message
+            const channel = await this.safeFetchChannel(pm.channelId);
+            if (!channel) return;
+            const message = await this.safeFetchMessage(channel, pm.messageId);
+            if (!message) return;
+
+            // Delete message
+            await this.deleteMessage(channel, message);
+        });
+
+        await Promise.all(promises);
     }
 }

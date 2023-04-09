@@ -1,4 +1,11 @@
-import { Interaction, Sticker } from "discord.js";
+import {
+    AttachmentBuilder,
+    Collection,
+    Embed,
+    Interaction,
+    Message,
+    Sticker,
+} from "discord.js";
 import * as fs from "fs";
 import fetch from "node-fetch";
 import ffmpeg from "fluent-ffmpeg";
@@ -170,5 +177,84 @@ export default class BaseHelpersCore {
         if (isEmpty) {
             await messageEvent.call();
         }
+    }
+
+    public cleanEmbeds(embeds: Embed[]) {
+        // Remove any embeds that are not type "rich"
+        return embeds.filter((e) => e.data.type === "rich");
+    }
+
+    public convertEmojis(message: Message) {
+        const emojis = message.content.match(/<a?:[a-zA-Z0-9_]+:[0-9]+>/g);
+        const replacement = emojis?.map((e) => {
+            const animated = e.startsWith("<a:");
+            const id = e.match(/:[0-9]+>/)?.[0].slice(1, -1);
+            if (!id) return e;
+            const emoji = message.client.emojis.cache.get(id);
+            if (emoji) return emoji.toString();
+            return `https://cdn.discordapp.com/emojis/${id}.${
+                animated ? "gif" : "png"
+            }?size=48&quality=lossless`;
+        });
+        if (!emojis || !replacement) return message.content;
+        for (let i = 0; i < emojis.length; i++) {
+            message.content = message.content.replace(
+                emojis[i],
+                replacement[i]
+            );
+        }
+        return message.content;
+    }
+
+    public async convertStickers(stickers: Collection<string, Sticker>) {
+        const convertedPromise: Promise<string | null>[] = stickers.map(
+            async (s) => {
+                const stickerFile = await this.stickerToGIF(s);
+                if (!stickerFile)
+                    return new Promise((resolve) => resolve(s.url));
+                return stickerFile;
+            }
+        );
+        const converted = await Promise.all(convertedPromise);
+        // Clean cache
+        if (converted.some((sticker) => sticker?.endsWith(".gif"))) {
+            this.cleanStickerCache();
+        }
+
+        return (
+            converted.filter((sticker) => sticker !== null) as string[]
+        ).map((s) => new AttachmentBuilder(s));
+    }
+
+    public async convertAttachments(message: Message) {
+        // Any media attachments we want to convert to links.
+        // Otherwise, we want to check if the attachment is small enough for us to send.
+        // If it is, send it. Else, send a link.
+
+        const attachments = message.attachments;
+        const media = attachments.filter(
+            (attachment) =>
+                attachment.contentType?.startsWith("image") ||
+                attachment.contentType?.startsWith("video")
+        );
+        const tooLarge = attachments.filter(
+            (attachment) =>
+                // Max upload size is 8 MiB
+                attachment.size > 8388608 - 512 && // Subtract 512 for good measure. Don't wanna go above the limit.
+                !media.has(attachment.id)
+        );
+        // Convert media and too large attachments to links
+        const linkified = media.concat(tooLarge);
+
+        // Remove media and too large attachments from attachments
+        const remaining = attachments.filter(
+            (attachment) =>
+                !(tooLarge.has(attachment.id) || media.has(attachment.id))
+        );
+
+        return {
+            linkified,
+            remaining,
+        };
     }
 }

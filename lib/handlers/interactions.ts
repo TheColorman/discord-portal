@@ -9,7 +9,7 @@ import {
     User,
 } from "discord.js";
 import DiscordHelpersCore from "../helpers/discord_helpers.core";
-import { PortalConnection, UserId } from "../types";
+import { PortalConnection, UserId, ChannelId } from "../types";
 import { portalIntro } from "../const";
 import { ADMINS, PREFIX } from "../../config.json";
 
@@ -17,19 +17,14 @@ async function announcePortalJoin(
     portalConnection: PortalConnection,
     helpers: DiscordHelpersCore
 ) {
-    const sharedConnections = helpers.getPortalConnections(
-        portalConnection.portalId
-    );
-    sharedConnections.forEach(async (connection) => {
-        if (connection.channelId === portalConnection.channelId) return;
-        const channel = await helpers.safeFetchChannel(connection.channelId);
-        if (!channel) return;
-        channel.send({
-            content: `📢 **${portalConnection.guildName.replace(
-                "**",
-                "\\*\\*"
-            )}** joined the Portal. Say hi!`,
-        });
+    // Announce join
+    helpers.sendMessageToPortalAsBot({
+        portalId: portalConnection.portalId,
+        options: `📢 **${portalConnection.guildName.replace(
+            "**",
+            "\\*\\*"
+        )}** joined the Portal. Say hi!`,
+        sourceChannelId: portalConnection.channelId,
     });
 }
 
@@ -430,6 +425,7 @@ async function handleInteraction(
                         },
                     ],
                 });
+                break;
             }
         }
     }

@@ -20,24 +20,14 @@ async function announcePortalLeave(
     portalConnection: PortalConnection,
     helpers: DiscordHelpersCore
 ) {
-    const sharedConnections = helpers.getPortalConnections(
-        portalConnection.portalId
-    );
-    sharedConnections.forEach(async (sharedConnection) => {
-        if (sharedConnection.channelId === portalConnection.channelId) return;
-        const channel = await helpers.safeFetchChannel(
-            sharedConnection.channelId
-        );
-        if (!channel) {
-            await helpers.deletePortalConnection(sharedConnection.channelId);
-            return;
-        }
-        channel.send({
-            content: `📢 **${portalConnection.guildName.replace(
-                "**",
-                "\\*\\*"
-            )}** left the Portal 👋.`,
-        });
+    // Send leave message
+    await helpers.sendMessageToPortalAsBot({
+        portalId: portalConnection.portalId,
+        sourceChannelId: portalConnection.channelId,
+        options: `📢 **${portalConnection.guildName.replace(
+            "**",
+            "\\*\\*"
+        )}** left the Portal 👋.`,
     });
 }
 
@@ -53,12 +43,10 @@ async function handleCommands(
         const args = message.content.slice(PREFIX.length).trim().split(/\s+/g);
         const command = args.shift()?.toLowerCase();
 
+        const portalConnection = helpers.getPortalConnection(message.channelId);
         switch (command) {
             case "portal":
             case "portals": {
-                const portalConnection = helpers.getPortalConnection(
-                    message.channel.id
-                );
                 if (!portalConnection) {
                     message.reply({
                         content:
@@ -95,62 +83,12 @@ async function handleCommands(
                     )
                     .join("\n");
 
-                portalConnections.forEach(async (portalConnection) => {
-                    const channel = await helpers.safeFetchChannel(
-                        portalConnection.channelId
-                    );
-                    // If no channel was found, the channel doesn't exist and we should delete the connection
-                    if (!channel) {
-                        helpers.deletePortalConnection(
-                            portalConnection.channelId
-                        );
-                        return;
-                    }
-                    const webhook = await helpers.getWebhook({
-                        channel: channel,
-                        webhookId: portalConnection.webhookId,
-                    });
-                    // If no webhook was found, the channel doesn't exist and we should delete the connection
-                    if (!webhook) {
-                        helpers.deletePortalConnection(
-                            portalConnection.channelId
-                        );
-                        return;
-                    }
+                const portalMessageId = helpers.getPortalMessageId(message.id);
 
-                    let portalMessageId = helpers.getPortalMessageId(
-                        message.id
-                    );
-
-                    const replyId =
-                        portalConnection.channelId === message.channel.id
-                            ? message.id
-                            : portalMessageId
-                            ? helpers
-                                  .getPortalMessages(portalMessageId)
-                                  .find(
-                                      (linkedPortalMessage) =>
-                                          linkedPortalMessage.channelId ===
-                                          portalConnection.channelId
-                                  )?.messageId
-                            : undefined;
-
-                    webhook.send({
+                helpers.sendMessageToPortalAsWebhook({
+                    options: {
                         content:
-                            `${
-                                replyId
-                                    ? `[[Reply to \`${
-                                          message.author.tag
-                                      }\` - \`${message.content
-                                          .split("\n")[0]
-                                          .slice(
-                                              0,
-                                              40
-                                          )}\`]](<https://discord.com/channels/${
-                                          channel.guildId
-                                      }/${channel.id}/${replyId}>)`
-                                    : `\`[Reply failed]\``
-                            }\nConnected to Portal \`#` +
+                            `\`Connected to Portal \`#` +
                             portal.id +
                             "` - " +
                             portal.emoji +
@@ -163,33 +101,65 @@ async function handleCommands(
                             ".\nConnection shared with\n" +
                             portalString +
                             "\n[Invite me](https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275683605585&scope=bot)",
-                        avatarURL: message.client.user.avatarURL() || "",
-                        username:
-                            portalConnection.guildId === message.guildId
-                                ? message.client.user.username
-                                : `${message.client.user.username} @ ${message.guild?.name}`,
-                    });
+                    },
+                    portalId: portal.id,
+                    sourceChannelId: message.channel.id,
+                    portalReferenceId: portalMessageId || "0",
                 });
+
                 break;
             }
             case "invite":
             case "link": {
-                message.reply(
-                    "Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275683605585&scope=bot"
-                );
+                const reply =
+                    "Invite me to your server: https://discord.com/api/oauth2/authorize?client_id=1057817052917805208&permissions=275683605585&scope=bot";
+                portalConnection
+                    ? helpers.sendMessageToPortalAsBot({
+                          options: {
+                              content: reply,
+                          },
+                          portalId: portalConnection.portalId,
+                          sourceChannelId: message.channelId,
+                          replyToPortalMessageId:
+                              helpers.getPortalMessageId(message.id) ||
+                              undefined,
+                      })
+                    : message.reply(reply);
                 break;
             }
             case "help":
             case "commands": {
-                message.reply(
-                    `\`${PREFIX}portal\` - Get information about the Portal connection of the current channel.\n\`${PREFIX}join\` - Join a Portal.\n\`${PREFIX}leave\` - Leave a Portal.\n\`${PREFIX}delete\` - Delete a Portal.\n\`${PREFIX}invite\` - Get an invite link for the bot.\n\`${PREFIX}help\` - Get a list of commands.`
-                );
+                const reply = `\`${PREFIX}portal\` - Get information about the Portal connection of the current channel.\n\`${PREFIX}join\` - Join a Portal.\n\`${PREFIX}leave\` - Leave a Portal.\n\`${PREFIX}delete\` - Delete a Portal.\n\`${PREFIX}invite\` - Get an invite link for the bot.\n\`${PREFIX}help\` - Get a list of commands.`;
+                portalConnection
+                    ? helpers.sendMessageToPortalAsBot({
+                          options: {
+                              content: reply,
+                          },
+                          portalId: portalConnection.portalId,
+                          sourceChannelId: message.channelId,
+                          replyToPortalMessageId:
+                              helpers.getPortalMessageId(message.id) ||
+                              undefined,
+                      })
+                    : message.reply(reply);
                 break;
             }
             case "setup":
             case "join": {
                 // Check permissions
                 if (!helpers.checkPermissions(message)) break;
+
+                if (portalConnection) {
+                    helpers.sendMessageToPortalAsBot({
+                        options: {
+                            content: "You're already connected to a Portal!",
+                        },
+                        portalId: portalConnection.portalId,
+                        sourceChannelId: message.channelId,
+                        replyToPortalMessageId:
+                            helpers.getPortalMessageId(message.id) || undefined,
+                    });
+                }
 
                 const portalGuildConnections =
                     helpers.getGuildPortalConnections(message.guildId);
@@ -327,8 +297,8 @@ async function handleCommands(
                 if (!ADMINS.includes(message.author.id)) break;
 
                 const subcommand = args.shift();
-                switch (subcommand) {
-                    case "clearWebhooks": {
+                switch (subcommand?.toLowerCase()) {
+                    case "clearwebhooks": {
                         const oauthGuilds = await message.client.guilds.fetch();
                         const progress = await message.channel.send(
                             `Deleting webhooks... (${oauthGuilds.size} guilds)`
@@ -361,7 +331,7 @@ async function handleCommands(
                         progress.edit(`Deleted ${webhookCount} webhooks.`);
                         break;
                     }
-                    case "registerCommands": {
+                    case "registercommands": {
                         const commands = [
                             new ContextMenuCommandBuilder()
                                 .setName("Limit to this channel")

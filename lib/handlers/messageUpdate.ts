@@ -12,40 +12,46 @@ async function handleMessageUpdate(
     const portalMessages = helpers.getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
-    // Edit linked messages
-    const promises: Promise<void>[] = [];
+    // Replace image embeds with links
+    const embeds = helpers.cleanEmbeds(newMessage.embeds);
 
-    portalMessages.forEach((portalMessage) => {
-        promises.push(
-            (async () => {
-                // Find channel and message objects
-                const channel = await helpers.safeFetchChannel(
-                    portalMessage.channelId
-                );
-                if (!channel) return;
-                const message = await helpers.safeFetchMessage(
-                    channel,
-                    portalMessage.messageId
-                );
-                if (!message) return;
+    // Convert unknown emojis
+    let content = helpers.convertEmojis(newMessage);
 
-                // Attempt to edit message
-                await helpers.editMessage(channel, portalMessage.messageId, {
-                    content: newMessage.content,
-                    // files: message.attachments.map((a) => ({
-                    //     attachment: a.url,
-                    //     name: a.name || undefined,
-                    // })),
-                    embeds: newMessage.embeds,
-                    allowedMentions: {
-                        parse: ["users"],
-                    },
-                });
-            })()
-        );
+    // Convert stickers
+    const stickerAttachments = await helpers.convertStickers(
+        newMessage.stickers
+    );
+
+    // Convert attachments
+    const { linkified, remaining } = await helpers.convertAttachments(
+        newMessage
+    );
+
+    // Replace content with first attachment link if there is no content, no embeds and no files.
+    if (
+        content.length === 0 &&
+        embeds.length === 0 &&
+        remaining.size === 0 &&
+        stickerAttachments.length === 0
+    ) {
+        content = linkified.first()?.url || ""
+        linkified.delete(linkified.firstKey() || "");
+        newMessage.attachments.delete(newMessage.attachments.firstKey() || "");
+    }
+
+    // Update portal message
+    await helpers.updatePortalMessage({
+        sourceMessage: newMessage,
+        options: {
+            content: content,
+            embeds: embeds,
+            files: [
+                ...(await helpers.convertStickers(newMessage.stickers)),
+                ...remaining.toJSON(),
+            ],
+        },
     });
-
-    await Promise.all(promises);
 }
 
 export default handleMessageUpdate;
