@@ -1,8 +1,11 @@
 import { AttachmentBuilder, Embed, Message } from "discord.js";
 import DiscordHelpersCore from "../helpers/discord_helpers.core";
-import { PortalDiscordMessage } from "../types";
+import { ValidMessage } from "../types";
 
-async function handlePortal(message: Message, helpers: DiscordHelpersCore) {
+async function handlePortal(
+    message: ValidMessage,
+    helpers: DiscordHelpersCore
+) {
     // why do I have to check this type again?
     if (!helpers.isValidChannel(message.channel)) return;
 

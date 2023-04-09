@@ -1,8 +1,9 @@
 import { Message, PartialMessage } from "discord.js";
 import DiscordHelpersCore from "../helpers/discord_helpers.core";
+import { ValidMessage } from "../types";
 
 async function handleMessageUpdate(
-    newMessage: Message | PartialMessage,
+    newMessage: ValidMessage,
     helpers: DiscordHelpersCore
 ) {
     // Check if message is a portal message

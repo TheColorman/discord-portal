@@ -98,14 +98,10 @@ client.on(Events.MessageCreate, async (message) => {
     if (message.webhookId) return;
     // Ignore if DM
     if (!helpers.isGuildMessage(message)) return;
-    // Ignore if not ValidChannel
-    if (!helpers.isValidChannel(message.channel)) return;
-    // Ignore if announcement from self
-    if (
-        message.content.startsWith("📢") &&
-        message.author.id === client.user?.id
-    )
-        return;
+    // Ignore if not ValidMessage (implies ValidChannel)
+    if (!helpers.isValidMessage(message)) return;
+    // Ignore if self
+    if (message.author.id === client.user?.id) return;
 
     // Portal functionality
     helpers.enqueueMessageEvent(
@@ -138,10 +134,16 @@ client.on(Events.MessageDelete, async (message) => {
 client.on(Events.MessageUpdate, async (oldMessage, newMessage) => {
     // Ignore webhook edits
     if (newMessage.webhookId) return;
+    // Fetch message if partial
+    const sourceMessage = newMessage.partial
+        ? await newMessage.fetch()
+        : newMessage;
+    // Ignore if not valid message
+    if (!helpers.isValidMessage(sourceMessage)) return;
 
     helpers.enqueueMessageEvent(
-        new MessageEvent(newMessage.id, messageEventQueueMap, async () => {
-            await handleMessageUpdate(newMessage, helpers);
+        new MessageEvent(sourceMessage.id, messageEventQueueMap, async () => {
+            await handleMessageUpdate(sourceMessage, helpers);
         })
     );
 });

@@ -18,6 +18,7 @@ import {
     PortalSourceMessage,
     PortalWebhookMessage,
     ValidChannel,
+    ValidMessage,
 } from "../types";
 import { webhookAvatars } from "../const";
 
@@ -344,6 +345,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             channel.type === ChannelType.PublicThread ||
             channel.type === ChannelType.PrivateThread
         );
+    }
+
+    public isValidMessage(message: Message): message is ValidMessage {
+        return this.isValidChannel(message.channel) && !message.partial;
     }
 
     /**
