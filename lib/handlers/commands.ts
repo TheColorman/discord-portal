@@ -298,6 +298,9 @@ async function handleCommands(
 
                 const subcommand = args.shift();
                 switch (subcommand?.toLowerCase()) {
+                    case "reloadwebhooks":
+                    case "resetwebhooks":
+                    case "deletewebhooks":
                     case "clearwebhooks": {
                         const oauthGuilds = await message.client.guilds.fetch();
                         const progress = await message.channel.send(
