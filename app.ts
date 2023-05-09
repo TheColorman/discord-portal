@@ -1,7 +1,7 @@
 import { Client, Events, GatewayIntentBits } from "discord.js";
 import sqlite3 from "better-sqlite3";
 import dotenv from "dotenv";
-import DiscordHelpersCore from "./lib/helpers/discord_helpers.core";
+import DiscordHelpersCore from "./lib/helpers/discordHelpers.core";
 import { MessageId, UserId } from "./lib/types";
 import {
     handlePortal,

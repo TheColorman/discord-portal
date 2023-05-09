@@ -1,5 +1,5 @@
 import type { Database } from "better-sqlite3";
-import BaseHelpersCore from "./helpers.core";
+import BaseHelpersCore from "./miscHelpers.core";
 import {
     ChannelId,
     MessageId,

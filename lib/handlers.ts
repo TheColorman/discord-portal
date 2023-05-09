@@ -1,9 +1,9 @@
-import handleCommands from "./handlers/commands";
-import handlePortal from "./handlers/portal";
-import handleDeleteMessage from "./handlers/messageDelete";
-import handleMessageUpdate from "./handlers/messageUpdate";
-import handleReact from "./handlers/reactions";
-import handleInteraction from "./handlers/interactions";
+import handleCommands from "./handlers/commandHandler";
+import handlePortal from "./handlers/messageCreateHandler";
+import handleDeleteMessage from "./handlers/messageDeleteHandler";
+import handleMessageUpdate from "./handlers/messageUpdateHandler";
+import handleReact from "./handlers/reactionHandler";
+import handleInteraction from "./handlers/interactionHandler";
 
 export {
     handleCommands,

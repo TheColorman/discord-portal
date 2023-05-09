@@ -15,7 +15,7 @@ import {
     WebhookMessageCreateOptions,
     WebhookMessageEditOptions,
 } from "discord.js";
-import DatabaseHelpersCore from "./database_helpers.core";
+import DatabaseHelpersCore from "./databaseHelpers.core";
 import { Database } from "better-sqlite3";
 import {
     AttachmentId,

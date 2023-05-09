@@ -8,7 +8,7 @@ import {
     Routes,
 } from "discord.js";
 import { PREFIX, ADMINS } from "../../config.json";
-import DiscordHelpersCore from "../helpers/discord_helpers.core";
+import DiscordHelpersCore from "../helpers/discordHelpers.core";
 import { PortalConnection, UserId } from "../types";
 import { portalIntro } from "../const";
 import dotenv from "dotenv";

@@ -8,7 +8,7 @@ import {
     TextInputStyle,
     User,
 } from "discord.js";
-import DiscordHelpersCore from "../helpers/discord_helpers.core";
+import DiscordHelpersCore from "../helpers/discordHelpers.core";
 import { PortalConnection, UserId, ChannelId } from "../types";
 import { portalIntro } from "../const";
 import { ADMINS, PREFIX } from "../../config.json";

@@ -1,5 +1,5 @@
 import { MessageReaction, PartialMessageReaction } from "discord.js";
-import DiscordHelpersCore from "../helpers/discord_helpers.core";
+import DiscordHelpersCore from "../helpers/discordHelpers.core";
 
 async function handleReact(
     reaction: MessageReaction | PartialMessageReaction,

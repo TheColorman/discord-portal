@@ -1,4 +1,4 @@
-import DiscordHelpersCore from "../helpers/discord_helpers.core";
+import DiscordHelpersCore from "../helpers/discordHelpers.core";
 import { ValidMessage } from "../types";
 
 async function handlePortal(
@@ -25,7 +25,7 @@ async function handlePortal(
     ) {
         // Remove send permissions from user
         if (!message.member) return;
-        try {
+        try { 
             await message.channel.permissionOverwrites.create(message.member, {
                 SendMessages: false,
             });

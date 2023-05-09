@@ -1,5 +1,5 @@
 import { Message, PartialMessage } from "discord.js";
-import DiscordHelpersCore from "../helpers/discord_helpers.core";
+import DiscordHelpersCore from "../helpers/discordHelpers.core";
 
 async function handleDeleteMessage(
     message: Message | PartialMessage,

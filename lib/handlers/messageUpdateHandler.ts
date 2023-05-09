@@ -1,4 +1,4 @@
-import DiscordHelpersCore from "../helpers/discord_helpers.core";
+import DiscordHelpersCore from "../helpers/discordHelpers.core";
 import { ValidMessage } from "../types";
 
 async function handleMessageUpdate(
