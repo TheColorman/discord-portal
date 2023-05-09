@@ -1,4 +1,4 @@
-FROM arm64v8/node:19-alpine
+FROM arm64v8/node:19-buster-slim
 
 COPY ./ /home/node/app/
 WORKDIR /home/node/app/
