@@ -1,4 +1,5 @@
 import { PREFIX } from "../config.json";
+import os from 'os';
 
 export const webhookAvatars = [
     "https://cdn.discordapp.com/avatars/1066196719173386261/e9b57e69088a7f5eff063317335bcb0f.webp",
@@ -56,3 +57,5 @@ export const portalIntro = {
         "**Do you want to share an invite link to your server** with the Portal? You can always remove it by re-joining the Portal.",
     confirm: `**Do you want to join this Portal?** You can also choose to share an invite to this server with the Portal. You can always leave using \`${PREFIX}leave\`.`,
 };
+
+export const osType = os.platform() === "win32" ? "Windows" : "Linux";

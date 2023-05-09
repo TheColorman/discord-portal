@@ -8,10 +8,10 @@ import {
 } from "discord.js";
 import * as fs from "fs";
 import fetch from "node-fetch";
-import ffmpeg from "fluent-ffmpeg";
 import { MAX_STICKERS_ON_DISK } from "../../config.json";
-import { emojiSuggestions, nameSuggestions } from "../const";
+import { emojiSuggestions, nameSuggestions, osType } from "../const";
 import { MessageEvent, Queue } from "../messageEventClasses";
+import { execFile } from "child_process";
 
 export default class BaseHelpersCore {
     /**
@@ -56,7 +56,7 @@ export default class BaseHelpersCore {
     /**
      * Convert a web APNG file to a local .gif file. If it fails, returns local .png file.
      * @param url Web URL of the APNG file
-     * @param id ID used to name the file
+     * @param id ID used to name the file. /!\ Warning: this value is passed directly to a binary.
      * @returns Path to local .gif file or .png file if conversion fails
      */
     public async convertAPNGtoGIF(url: string, id: string) {
@@ -70,26 +70,28 @@ export default class BaseHelpersCore {
             PNGstream.on("finish", resolve);
         });
 
-        // Output as .gif
+        // Convert to .gif using apng2gif
+        const promise = new Promise<string | null>((resolve, reject) => {
+            execFile(
+                `./bin/apng2gif${osType === "Windows" ? ".exe" : ""}`,
+                [`./stickers/${id}.png`, `./stickers/${id}.gif`],
+                (err, stdout, stderr) => {
+                    if (err) {
+                        console.error(err);
+                        reject(err);
+                        return null;
+                    }
+                    resolve(`./stickers/${id}.gif`);
+                }
+            );
+        });
+
+        // Wait for conversion to finish
         try {
-            // Wait for conversion to finishimage.png
-            await new Promise((resolve, reject) => {
-                ffmpeg(`./stickers/${id}.png`)
-                    .addOption([
-                        "-gifflags -offsetting",
-                        "-lavfi split[v],palettegen,[v]paletteuse",
-                    ])
-                    .saveToFile(`./stickers/${id}.gif`)
-                    .on("end", resolve)
-                    .on("error", reject);
-            });
-            return `./stickers/${id}.gif`;
+            const result = await promise;
+            return result;
         } catch (err) {
-            // console.error(err);
-            // There was an error, so the .gif file is likely corrupted.
-            // Delete it and return the .png file instead.
-            if (fs.existsSync(`./stickers/${id}.gif`))
-                fs.unlinkSync(`./stickers/${id}.gif`);
+            console.error(err);
             return `./stickers/${id}.png`;
         }
     }
