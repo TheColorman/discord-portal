@@ -1,4 +1,3 @@
-import { Message, PartialMessage } from "discord.js";
 import DiscordHelpersCore from "../helpers/discord_helpers.core";
 import { ValidMessage } from "../types";
 
@@ -11,6 +10,15 @@ async function handleMessageUpdate(
     if (!portalMessageId) return;
     const portalMessages = helpers.getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
+
+    // Remove first line if it is a reply
+    const firstline = newMessage.content.split("\n")[0];
+    if (
+        firstline.includes("Reply to") ||
+        firstline.includes("`Reply failed`")
+    ) {
+        newMessage.content = newMessage.content.split("\n").slice(1).join("\n");
+    }
 
     // Replace image embeds with links
     const embeds = helpers.cleanEmbeds(newMessage.embeds);
@@ -35,7 +43,7 @@ async function handleMessageUpdate(
         remaining.size === 0 &&
         stickerAttachments.length === 0
     ) {
-        content = linkified.first()?.url || ""
+        content = linkified.first()?.url || "";
         linkified.delete(linkified.firstKey() || "");
         newMessage.attachments.delete(newMessage.attachments.firstKey() || "");
     }

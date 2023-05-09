@@ -949,11 +949,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             // We want to keep the first line of the original message content, if it is a reply to another message
             const firstline = message.content.split("\n")[0];
             if (
-                firstline.includes("Reply to ") ||
+                firstline.includes("Reply to") ||
                 firstline.includes("`Reply failed`")
             ) {
-                const firstLine = message.content.split("\n")[0];
-                options.content = firstLine + "\n" + options.content;
+                options.content = firstline + "\n" + options.content;
             }
 
             await webhook.editMessage(portalMessage.messageId, options);
