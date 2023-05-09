@@ -795,10 +795,11 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 // Format reply
                 const authorTag = originalMessage?.author?.tag || "Unknown";
                 // Remove first line from message content if it contains reply text
+                const firstline = message.content.split("\n")[0];
                 if (
-                    message.content.startsWith("[[Reply to") ||
-                    message.content.startsWith("`[Reply failed]`") ||
-                    message.content.startsWith("(Click to see attachment 🖾)")
+                    firstline.includes("Reply to") ||
+                    firstline.includes("`Reply failed`") ||
+                    firstline.includes("Click to see attachment 🖾")
                 ) {
                     message.content = message.content
                         .split("\n")
@@ -826,23 +827,41 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 const channelId = message.channelId;
                 const messageId = message.id;
 
-                return (
-                    "[[Reply to " +
-                    (originalMessage?.channelId === channelId
-                        ? originalMessage.author?.toString()
-                        : "`@" + authorTag + "`") +
-                    " - `" +
-                    referenceContent +
-                    "`]]" +
-                    "(<https://discord.com/channels/" +
-                    guildId +
-                    "/" +
-                    channelId +
-                    "/" +
-                    messageId +
-                    ">)"
-                );
-            })()) || "`[Reply failed]`";
+                const url = `https://discord.com/channels/${guildId}/${channelId}/${messageId}`;
+
+                const sameChannel = originalMessage?.channelId === channelId;
+                const authorString = sameChannel
+                    ? originalMessage?.author?.toString()
+                    : "`@" + authorTag + "`";
+                const brackets = "⦗⦘";
+
+                return sameChannel
+                    ? "[" +
+                          brackets[0] +
+                          "Reply to" +
+                          "](<" +
+                          url +
+                          ">) " +
+                          authorString +
+                          " [- `" +
+                          referenceContent +
+                          "`" +
+                          brackets[1] +
+                          "](<" +
+                          url +
+                          ">)"
+                    : "[" +
+                          brackets[0] +
+                          "Reply to " +
+                          authorString +
+                          " - `" +
+                          referenceContent +
+                          "`" +
+                          brackets[1] +
+                          "](<" +
+                          url +
+                          ">)";
+            })()) || "`⦗Reply failed⦘`";
 
         return {
             ...options,
@@ -928,9 +947,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             }
 
             // We want to keep the first line of the original message content, if it is a reply to another message
+            const firstline = message.content.split("\n")[0];
             if (
-                message.content.startsWith("[[Reply to `@") ||
-                message.content.startsWith("`[Reply failed]`")
+                firstline.includes("Reply to ") ||
+                firstline.includes("`Reply failed`")
             ) {
                 const firstLine = message.content.split("\n")[0];
                 options.content = firstLine + "\n" + options.content;
