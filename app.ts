@@ -13,6 +13,7 @@ import {
 } from "./lib/handlers";
 import fullSetup from "./lib/setup";
 import { MessageEvent, Queue } from "./lib/messageEventClasses";
+import * as fs from "fs";
 dotenv.config();
 
 Error.stackTraceLimit = Infinity; //! Remove in production

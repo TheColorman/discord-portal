@@ -10,7 +10,10 @@ services:
       - NODE_ENV=production
     volumes:
       - ./:/home/node/app
+      - /home/node/app/node_modules
+      - /home/node/app/bin
     security_opt:
       - seccomp:unconfined
     command: npm run setup
+    # command: ls -l
     restart: unless-stopped

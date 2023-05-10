@@ -7,7 +7,7 @@
     "build": "npx tsc",
     "dev": "tsc -w",
     "run": "npx nodemon out/app.js",
-    "setup": "npm install && npm run build && npm run start"
+    "setup": "npm run build && npm run start"
   },
   "author": "Colorman",
   "license": "GPLv3",

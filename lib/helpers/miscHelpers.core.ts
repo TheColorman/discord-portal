@@ -11,7 +11,7 @@ import fetch from "node-fetch";
 import { MAX_STICKERS_ON_DISK } from "../../config.json";
 import { emojiSuggestions, nameSuggestions, osType } from "../const";
 import { MessageEvent, Queue } from "../messageEventClasses";
-import { execFile } from "child_process";
+import { exec } from "child_process";
 
 export default class BaseHelpersCore {
     /**
@@ -63,7 +63,9 @@ export default class BaseHelpersCore {
         // Create file
         const response = await fetch(url);
         if (!response.body) return null;
-        const PNGstream = fs.createWriteStream(`./stickers/${id}.png`);
+        const PNGstream = fs.createWriteStream(`./stickers/${id}.png`, {
+            mode: 0o777,
+        });
         response.body.pipe(PNGstream);
         // Wait for file to be created
         await new Promise((resolve) => {
@@ -72,18 +74,18 @@ export default class BaseHelpersCore {
 
         // Convert to .gif using apng2gif
         const promise = new Promise<string | null>((resolve, reject) => {
-            execFile(
-                `./bin/apng2gif${osType === "Windows" ? ".exe" : ""}`,
-                [`./stickers/${id}.png`, `./stickers/${id}.gif`],
-                (err, stdout, stderr) => {
-                    if (err) {
-                        console.error(err);
-                        reject(err);
-                        return null;
-                    }
+            const command = `/home/node/app/bin/apng2gif${
+                osType === "Windows" ? ".exe" : ""
+            } /home/node/app/stickers/${id}.png /home/node/app/stickers/${id}.gif`;
+            exec(command, (err, stdout, stderr) => {
+                if (err) {
+                    console.error(err);
+                    console.error(stderr);
+                    resolve(null);
+                } else {
                     resolve(`./stickers/${id}.gif`);
                 }
-            );
+            });
         });
 
         // Wait for conversion to finish
