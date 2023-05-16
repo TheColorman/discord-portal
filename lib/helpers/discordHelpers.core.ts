@@ -819,7 +819,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                                   if (!user) return "@Unknown";
                                   return `@${user.username}`;
                               });
-                // Escape backticksmen 
+                // Escape backticksmen
                 referenceContent = referenceContent.replace(/`/g, "´");
                 // Limit reference content length
                 if (referenceContent.length > 50 - authorTag.length)
@@ -945,9 +945,13 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
 
             const message = await webhook.fetchMessage(portalMessage.messageId);
 
-            if (typeof options === "function") {
-                options = await options(message);
-            }
+            const localOptions = JSON.parse(
+                JSON.stringify(
+                    typeof options === "function"
+                        ? await options(message)
+                        : options
+                )
+            );
 
             // We want to keep the first line of the original message content, if it is a reply to another message
             const firstline = message.content.split("\n")[0];
@@ -955,10 +959,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 firstline.includes("Reply to") ||
                 firstline.includes("`Reply failed`")
             ) {
-                options.content = firstline + "\n" + options.content;
+                localOptions.content = firstline + "\n" + localOptions.content;
             }
 
-            await webhook.editMessage(portalMessage.messageId, options);
+            await webhook.editMessage(portalMessage.messageId, localOptions);
         });
 
         await Promise.all(promises);
@@ -981,7 +985,6 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             options,
         });
 
-        // return;
         // Update attachments
         // /i\ The only update an attachment can receive is a removal.
         // So the only thing we need to do is remove any attachments that aren't in the new list.
