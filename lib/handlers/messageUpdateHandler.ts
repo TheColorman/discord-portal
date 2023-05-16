@@ -11,15 +11,6 @@ async function handleMessageUpdate(
     const portalMessages = helpers.getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
-    // Remove first line if it is a reply
-    const firstline = newMessage.content.split("\n")[0];
-    if (
-        firstline.includes("Reply to") ||
-        firstline.includes("`Reply failed`")
-    ) {
-        newMessage.content = newMessage.content.split("\n").slice(1).join("\n");
-    }
-
     // Replace image embeds with links
     const embeds = helpers.cleanEmbeds(newMessage.embeds);
 
