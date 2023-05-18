@@ -696,14 +696,19 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 return localPortalReference;
             })();
 
-            // Get message content
-            const content = localPortalReference
+            // Format any cross-server features
+            let content = await this.processMessageContent({
+                options,
+                channel,
+            });
+
+            // Get reply message content
+            content = localPortalReference
                 ? await this.formatWebhookReply({
-                      options,
+                      options: content,
                       portalMessage: localPortalReference,
                   })
-                : options;
-            // Merge message content with options
+                : content;
 
             // Send message
             const sent = await this.sendMessageAsWebhook({
@@ -808,7 +813,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 }
                 let referenceContent =
                     // Check if message is attachment
-                    message.embeds.length
+                    message.content.length === 0
                         ? "(Click to see attachment 🖾)"
                         : message.content
                               .replace(/\n/g, " ")
@@ -1009,5 +1014,88 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
         });
 
         await Promise.all(promises);
+    }
+
+    /**
+     * Prepares a message to be sent to a Portal.
+     * @param message Discord message
+     * @returns Object including content, embeds and files
+     */
+    public async preparePortalMessage(message: ValidMessage) {
+        // -- Preprocess message --
+        // Replace image embeds with links
+        const embeds = this.cleanEmbeds(message.embeds);
+
+        // Convert unknown emojis
+        let content = this.convertEmojis(message);
+
+        // Convert stickers
+        const stickerAttachments = await this.convertStickers(message.stickers);
+
+        // Convert attachments
+        const { linkified, remaining } = await this.convertAttachments(message);
+
+        // Replace content with first attachment link if there is no content, no embeds and no files.
+        if (
+            content.length === 0 &&
+            embeds.length === 0 &&
+            remaining.size === 0 &&
+            stickerAttachments.length === 0
+        ) {
+            content = linkified.first()?.url || "";
+            linkified.delete(linkified.firstKey() || "");
+            message.attachments.delete(message.attachments.firstKey() || "");
+        }
+
+        return {
+            content,
+            embeds,
+            files: [...stickerAttachments, ...remaining.toJSON()],
+            attachments: linkified,
+        };
+    }
+
+    /**
+     * Preprocesses a message to be sent to a Portal as a webhook.
+     * @param param0 The message options to modify and the channel the message will me sent to
+     */
+    public async processMessageContent({
+        options,
+        channel,
+    }: {
+        options: WebhookMessageCreateOptions;
+        channel: ValidChannel;
+    }): Promise<WebhookMessageCreateOptions> {
+        if (!options.content) return options;
+        // Mentions
+        const mentionFinder = /@(.+)#(\d{4})/gm;
+        const mentions = [...options.content.matchAll(mentionFinder)];
+
+        if (mentions.length == 0) {
+            return options; // We don't have any other features right now so this is fine
+        }
+
+        const promises = mentions.map(async (mention) => {
+            const [match, username, discriminator] = mention;
+
+            const members = await channel.guild.members.fetch({
+                query: username,
+            });
+            const member = members.find(
+                (m) =>
+                    m.user.username === username &&
+                    m.user.discriminator === discriminator
+            );
+            if (!member) return;
+
+            // Replace mention with user id
+            options.content = options.content!.replace(
+                match,
+                `<@${member.id}>`
+            );
+        });
+
+        await Promise.all(promises);
+        return options;
     }
 }
