@@ -1010,4 +1010,44 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
 
         await Promise.all(promises);
     }
+
+    /**
+     * Prepares a message to be sent to a Portal.
+     * @param message Discord message
+     * @returns Object including content, embeds and files
+     */
+    public async preparePortalMessage(message: ValidMessage) {
+        // -- Preprocess message --
+        // Replace image embeds with links
+        const embeds = this.cleanEmbeds(message.embeds);
+    
+        // Convert unknown emojis
+        let content = this.convertEmojis(message);
+    
+        // Convert stickers
+        const stickerAttachments = await this.convertStickers(message.stickers);
+    
+        // Convert attachments
+        const { linkified, remaining } =
+            await this.convertAttachments(message);
+    
+        // Replace content with first attachment link if there is no content, no embeds and no files.
+        if (
+            content.length === 0 &&
+            embeds.length === 0 &&
+            remaining.size === 0 &&
+            stickerAttachments.length === 0
+        ) {
+            content = linkified.first()?.url || ""
+            linkified.delete(linkified.firstKey() || "");
+            message.attachments.delete(message.attachments.firstKey() || "");
+        }
+
+        return {
+            content,
+            embeds,
+            files: [...stickerAttachments, ...remaining.toJSON()],
+            attachments: linkified,
+        }
+    }
 }

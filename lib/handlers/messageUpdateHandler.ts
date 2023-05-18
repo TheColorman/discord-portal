@@ -11,33 +11,8 @@ async function handleMessageUpdate(
     const portalMessages = helpers.getPortalMessages(portalMessageId);
     if (!portalMessages.size) return;
 
-    // Replace image embeds with links
-    const embeds = helpers.cleanEmbeds(newMessage.embeds);
-
-    // Convert unknown emojis
-    let content = helpers.convertEmojis(newMessage);
-
-    // Convert stickers
-    const stickerAttachments = await helpers.convertStickers(
-        newMessage.stickers
-    );
-
-    // Convert attachments
-    const { linkified, remaining } = await helpers.convertAttachments(
-        newMessage
-    );
-
-    // Replace content with first attachment link if there is no content, no embeds and no files.
-    if (
-        content.length === 0 &&
-        embeds.length === 0 &&
-        remaining.size === 0 &&
-        stickerAttachments.length === 0
-    ) {
-        content = linkified.first()?.url || "";
-        linkified.delete(linkified.firstKey() || "");
-        newMessage.attachments.delete(newMessage.attachments.firstKey() || "");
-    }
+    const { content, embeds, files } =
+        await helpers.preparePortalMessage(newMessage);
 
     // Update portal message
     await helpers.updatePortalMessage({
@@ -45,10 +20,7 @@ async function handleMessageUpdate(
         options: {
             content: content,
             embeds: embeds,
-            files: [
-                ...(await helpers.convertStickers(newMessage.stickers)),
-                ...remaining.toJSON(),
-            ],
+            files: files,
         },
     });
 }

@@ -36,31 +36,7 @@ async function handlePortal(
     }
 
     // Send message to other channels
-    // -- Preprocess message --
-    // Replace image embeds with links
-    const embeds = helpers.cleanEmbeds(message.embeds);
-
-    // Convert unknown emojis
-    let content = helpers.convertEmojis(message);
-
-    // Convert stickers
-    const stickerAttachments = await helpers.convertStickers(message.stickers);
-
-    // Convert attachments
-    const { linkified, remaining } =
-        await helpers.convertAttachments(message);
-
-    // Replace content with first attachment link if there is no content, no embeds and no files.
-    if (
-        content.length === 0 &&
-        embeds.length === 0 &&
-        remaining.size === 0 &&
-        stickerAttachments.length === 0
-    ) {
-        content = linkified.first()?.url || ""
-        linkified.delete(linkified.firstKey() || "");
-        message.attachments.delete(message.attachments.firstKey() || "");
-    }
+    const { content, embeds, files, attachments } = await helpers.preparePortalMessage(message);
 
     // Send initial message
     await helpers.propegatePortalMessage({
@@ -75,13 +51,13 @@ async function handlePortal(
                 message.member?.avatarURL() ||
                 message.author.avatarURL() ||
                 undefined,
-            embeds: embeds,
-            files: [...stickerAttachments, ...remaining.toJSON()],
+            embeds,
+            files,
             allowedMentions: {
                 parse: ["users"],
             },
         },
-        attachments: linkified
+        attachments
     });
 }
 
