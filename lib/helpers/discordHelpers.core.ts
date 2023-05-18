@@ -1068,7 +1068,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
     }): Promise<WebhookMessageCreateOptions> {
         if (!options.content) return options;
         // Mentions
-        const mentionFinder = /@(.+)#(\d{4})/gm;
+        const mentionFinder = /@(.+?)#(\d{4})/gm;
         const mentions = [...options.content.matchAll(mentionFinder)];
 
         if (mentions.length == 0) {
