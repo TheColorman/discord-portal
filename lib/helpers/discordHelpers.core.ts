@@ -3,6 +3,9 @@ import {
     ChannelType,
     Client,
     Collection,
+    FetchMemberOptions,
+    FetchMembersOptions,
+    Guild,
     GuildEmoji,
     Invite,
     Message,
@@ -11,6 +14,7 @@ import {
     MessagePayload,
     PermissionFlagsBits,
     ReactionEmoji,
+    UserResolvable,
     Webhook,
     WebhookMessageCreateOptions,
     WebhookMessageEditOptions,
@@ -699,7 +703,8 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             // Format any cross-server features
             let content = await this.processMessageContent({
                 options,
-                channel,
+                targetChannel: channel,
+                originalMessage: message,
             });
 
             // Get reply message content
@@ -1061,41 +1066,89 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      */
     public async processMessageContent({
         options,
-        channel,
+        targetChannel,
+        originalMessage,
     }: {
         options: WebhookMessageCreateOptions;
-        channel: ValidChannel;
+        targetChannel: ValidChannel;
+        originalMessage: ValidMessage;
     }): Promise<WebhookMessageCreateOptions> {
-        if (!options.content) return options;
-        // Mentions
-        const mentionFinder = /@(.+?)#(\d{4})/gm;
-        const mentions = [...options.content.matchAll(mentionFinder)];
 
-        if (mentions.length == 0) {
-            return options; // We don't have any other features right now so this is fine
-        }
+        // Cross-server mentions
+        let newOptions = await (async () => {
+            if (!options.content) return options;
 
-        const promises = mentions.map(async (mention) => {
-            const [match, username, discriminator] = mention;
+            const mentionFinder = /@(.+?)#(\d{4})/gm;
+            const mentions = [...options.content.matchAll(mentionFinder)];
 
-            const members = await channel.guild.members.fetch({
-                query: username,
+            if (mentions.length == 0) {
+                return options; // We don't have any other features right now so this is fine
+            }
+
+            const promises = mentions.map(async (mention) => {
+                const [match, username, discriminator] = mention;
+
+                const members = await targetChannel.guild.members.fetch({
+                    query: username,
+                });
+                const member = members.find(
+                    (m) =>
+                        m.user.username === username &&
+                        m.user.discriminator === discriminator
+                );
+                if (!member) return;
+
+                // Replace mention with user id
+                options.content = options.content!.replace(
+                    match,
+                    `<@${member.id}>`
+                );
             });
-            const member = members.find(
-                (m) =>
-                    m.user.username === username &&
-                    m.user.discriminator === discriminator
-            );
-            if (!member) return;
 
-            // Replace mention with user id
-            options.content = options.content!.replace(
-                match,
-                `<@${member.id}>`
-            );
-        });
+            await Promise.all(promises);
+            return options;
+        })();
 
-        await Promise.all(promises);
+        // Format mentions as normal text on servers that dont have the mentioned user
+        newOptions = await (async () => {
+            if (!originalMessage.mentions.users.size) return newOptions;
+
+            const promises = originalMessage.mentions.users.map(
+                async (mentionedUser) => {
+                    const member = await this.safeFetchMember(
+                        targetChannel.guild,
+                        mentionedUser
+                    );
+                    if (member) return;
+
+                    // Replace mention with username and discriminator
+                    newOptions.content = newOptions.content!.replace(
+                        `<@${mentionedUser.id}>`,
+                        `@${mentionedUser.username}#${mentionedUser.discriminator}`
+                    );
+                }
+            );
+
+            await Promise.all(promises);
+            return newOptions;
+        })();
+
         return options;
+    }
+
+    /**
+     * Attempts to fetch a member from a guild. Returns null if not found.
+     * @param guild Guild to fetch member from
+     * @param options Options to pass to members.fetch
+     * @returns Member or null if not found
+     */
+    public async safeFetchMember(guild: Guild, options: UserResolvable | FetchMemberOptions | (FetchMembersOptions & {
+        user: UserResolvable;
+    })) {
+        try {
+            return await guild.members.fetch(options);
+        } catch (e) {
+            return null;
+        }
     }
 }
