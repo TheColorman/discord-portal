@@ -14,6 +14,10 @@ import {
     LimitedAccount,
     SQlite3Bind,
     AttachmentId,
+    DBPortal,
+    DBPortalConnection,
+    DBPortalMessage,
+    DBLimitedAccount,
 } from "../types";
 import { Collection } from "discord.js";
 
@@ -128,7 +132,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
     public getPortal(portalId: string): Portal | null {
         const portal = this.db
             .prepare("SELECT * FROM portals WHERE id = ?")
-            .get(portalId);
+            .get(portalId) as DBPortal | null;
         if (!portal) return null;
         return {
             id: portal.id,
@@ -146,7 +150,9 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
      * @returns Collection of Portals mapped by Portal ID
      */
     public getPortals(): Collection<PortalId, Portal> {
-        const portals = this.db.prepare("SELECT * FROM portals").all();
+        const portals = this.db
+            .prepare("SELECT * FROM portals")
+            .all() as DBPortal[];
         return new Collection<PortalId, Portal>(
             portals.map((portal) => [
                 portal.id,
@@ -173,7 +179,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
     ): Collection<ChannelId, PortalConnection> {
         const portalConnections = this.db
             .prepare("SELECT * FROM portalConnections WHERE guildId = ?")
-            .all(guildId);
+            .all(guildId) as DBPortalConnection[];
         return new Collection<ChannelId, PortalConnection>(
             portalConnections.map((portalConnection) => [
                 portalConnection.channelId,
@@ -183,7 +189,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
                     guildName: portalConnection.guildName,
                     channelId: portalConnection.channelId,
                     channelName: portalConnection.channelName,
-                    guildInvite: portalConnection.guildInvite,
+                    guildInvite: portalConnection.guildInvite ?? undefined,
                     webhookId: portalConnection.webhookId,
                     webhookToken: portalConnection.webhookToken,
                 },
@@ -199,7 +205,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
     public getPortalConnection(channelId: string): PortalConnection | null {
         const portalConnection = this.db
             .prepare("SELECT * FROM portalConnections WHERE channelId = ?")
-            .get(channelId);
+            .get(channelId) as DBPortalConnection | null;
         if (!portalConnection) return null;
         return {
             portalId: portalConnection.portalId,
@@ -207,7 +213,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
             guildName: portalConnection.guildName,
             channelId: portalConnection.channelId,
             channelName: portalConnection.channelName,
-            guildInvite: portalConnection.guildInvite,
+            guildInvite: portalConnection.guildInvite ?? undefined,
             webhookId: portalConnection.webhookId,
             webhookToken: portalConnection.webhookToken,
         };
@@ -223,7 +229,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
     ): Collection<ChannelId, PortalConnection> {
         const portalConnections = this.db
             .prepare("SELECT * FROM portalConnections WHERE portalId = ?")
-            .all(portalId);
+            .all(portalId) as DBPortalConnection[];
         return new Collection<ChannelId, PortalConnection>(
             portalConnections.map((portalConnection) => [
                 portalConnection.channelId,
@@ -233,7 +239,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
                     guildName: portalConnection.guildName,
                     channelId: portalConnection.channelId,
                     channelName: portalConnection.channelName,
-                    guildInvite: portalConnection.guildInvite,
+                    guildInvite: portalConnection.guildInvite ?? undefined,
                     webhookId: portalConnection.webhookId,
                     webhookToken: portalConnection.webhookToken,
                 },
@@ -348,7 +354,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
     ): Collection<MessageId, PortalMessage> {
         const portalMessages = this.db
             .prepare("SELECT * FROM portalMessages WHERE id = ?")
-            .all(id);
+            .all(id) as DBPortalMessage[];
         return new Collection<MessageId, PortalMessage>(
             portalMessages.map((portalMessage) => [
                 portalMessage.messageId,
@@ -358,7 +364,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
                     messageId: portalMessage.messageId,
                     channelId: portalMessage.channelId,
                     messageType: portalMessage.messageType,
-                    attachmentId: portalMessage.attachmentId,
+                    attachmentId: portalMessage.attachmentId ?? undefined,
                 },
             ])
         );
@@ -370,9 +376,11 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
      * @returns Id of the Portal Message
      */
     public getPortalMessageId(messageId: MessageId): PortalMessageId | null {
-        const portalMessageId = this.db
-            .prepare("SELECT id FROM portalMessages WHERE messageId = ?")
-            .get(messageId)?.id;
+        const portalMessageId = (
+            this.db
+                .prepare("SELECT id FROM portalMessages WHERE messageId = ?")
+                .get(messageId) as DBPortalMessage | null
+        )?.id;
         if (!portalMessageId) return null;
         return portalMessageId;
     }
@@ -385,7 +393,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
     public getLimitedAccounts(userId: UserId): LimitedAccount[] {
         const limitedAccounts = this.db
             .prepare("SELECT * FROM limitedAccounts WHERE id = ?")
-            .all(userId);
+            .all(userId) as DBLimitedAccount[];
         return limitedAccounts.map((limitedAccount) => ({
             userId: limitedAccount.userId,
             portalId: limitedAccount.portalId,
@@ -412,7 +420,7 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
             .prepare(
                 "SELECT * FROM limitedAccounts WHERE userId = ? AND portalId = ?"
             )
-            .get(userId, portalId);
+            .get(userId, portalId) as DBLimitedAccount | null;
         if (!limitedAccount) return null;
         return {
             userId: limitedAccount.userId,

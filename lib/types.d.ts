@@ -7,7 +7,7 @@ import {
     Message,
 } from "discord.js";
 
-// Types
+// DB objects - TS version
 export type Portal = {
     id: string;
     name: string;
@@ -50,6 +50,44 @@ export type LimitedAccount = {
     banned: boolean;
     bot: boolean;
 };
+// DB Object - DB version
+export type DBPortal = {
+    id: string;
+    name: string;
+    emoji: string;
+    customEmoji: 0 | 1;
+    nsfw: 0 | 1;
+    private: 0 | 1;
+    password: string;
+}
+export type DBPortalConnection = {
+    portalId: string;
+    guildId: string;
+    guildName: string;
+    channelId: string;
+    channelName: string;
+    guildInvite: string | null;
+    webhookId: string;
+    webhookToken: string;
+}
+export type DBPortalMessage = {
+    id: string;
+    portalId: string;
+    messageId: string;
+    channelId: string;
+    messageType: MessageType;
+    attachmentId: string | null;
+}
+export type DBLimitedAccount = {
+    userId: string;
+    portalId: string;
+    channelId: string;
+    reason: string;
+    banned: 0 | 1;
+    bot: 0 | 1;
+}
+
+
 export type PortalId = string;
 export type ChannelId = string;
 export type MessageId = string;
