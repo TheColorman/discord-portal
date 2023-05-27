@@ -51,10 +51,16 @@ function setupDatabase(db: BetterSqlite3.Database) {
     ).run();
 
     // Create default portal if none exists
-    if (!db.prepare("SELECT COUNT(1) FROM portals").get()) {
+    if (
+        (
+            db.prepare("SELECT COUNT(1) FROM portals").get() as {
+                "COUNT(1)": number;
+            }
+        )["COUNT(1)"] === 0
+    ) {
         db.prepare(
             "INSERT INTO portals (id, name, emoji, customEmoji, nsfw, private, password) VALUES (?, ?, ?, ?, ?, ?, ?)"
-        ).run(["123456", "Genesis", "🎆", false, false, false, ""]);
+        ).run(["123456", "Genesis", "🎆", 0, 0, 0, ""]);
     }
 }
 
