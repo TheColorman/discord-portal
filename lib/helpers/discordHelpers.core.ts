@@ -829,8 +829,11 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                                   if (!user) return "@Unknown";
                                   return `@${user.username}`;
                               });
-                // Escape backticksmen
+                // Escape backticks
                 referenceContent = referenceContent.replace(/`/g, "´");
+                // Escape square brackets
+                referenceContent = referenceContent.replace(/\[/g, "［");
+                referenceContent = referenceContent.replace(/\]/g, "］");
                 // Limit reference content length
                 if (referenceContent.length > 50 - authorTag.length)
                     referenceContent =
