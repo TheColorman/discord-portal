@@ -1076,12 +1076,11 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
         targetChannel: ValidChannel;
         originalMessage: ValidMessage;
     }): Promise<WebhookMessageCreateOptions> {
-
         // Cross-server mentions
         let newOptions = await (async () => {
             if (!options.content) return options;
 
-            const mentionFinder = /@(.+?)#(\d{4})/gm;
+            const mentionFinder = /@\S+/gm;
             const mentions = [...options.content.matchAll(mentionFinder)];
 
             if (mentions.length == 0) {
@@ -1089,21 +1088,22 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             }
 
             const promises = mentions.map(async (mention) => {
-                const [match, username, discriminator] = mention;
+                const match = mention[0].slice(1);
+                const [username, discriminator] = match.split("#");
 
                 const members = await targetChannel.guild.members.fetch({
                     query: username,
                 });
-                const member = members.find(
-                    (m) =>
-                        m.user.username === username &&
-                        m.user.discriminator === discriminator
+                const member = members.find((m) =>
+                    m.user.username === username && discriminator
+                        ? m.user.discriminator === discriminator
+                        : true
                 );
                 if (!member) return;
 
                 // Replace mention with user id
                 options.content = options.content!.replace(
-                    match,
+                    `@${match}`,
                     `<@${member.id}>`
                 );
             });
@@ -1145,9 +1145,15 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      * @param options Options to pass to members.fetch
      * @returns Member or null if not found
      */
-    public async safeFetchMember(guild: Guild, options: UserResolvable | FetchMemberOptions | (FetchMembersOptions & {
-        user: UserResolvable;
-    })) {
+    public async safeFetchMember(
+        guild: Guild,
+        options:
+            | UserResolvable
+            | FetchMemberOptions
+            | (FetchMembersOptions & {
+                  user: UserResolvable;
+              })
+    ) {
         try {
             return await guild.members.fetch(options);
         } catch (e) {
