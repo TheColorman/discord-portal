@@ -88,7 +88,7 @@ async function handleCommands(
                 helpers.sendMessageToPortalAsWebhook({
                     options: {
                         content:
-                            `\`Connected to Portal \`#` +
+                            `Connected to Portal \`#` +
                             portal.id +
                             "` - " +
                             portal.emoji +
