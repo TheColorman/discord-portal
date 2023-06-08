@@ -48,7 +48,7 @@ async function handlePortal(
         message,
         options: {
             content,
-            username: `${tag} ${
+            username: `${tag}${
                 message.guild?.name ? ` @ ${message.guild.name}` : ""
             }`,
             avatarURL:
