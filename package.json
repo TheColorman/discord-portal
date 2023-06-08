@@ -6,7 +6,7 @@
     "start": "node out/app.js --no-warnings",
     "build": "npx tsc",
     "dev": "tsc -w",
-    "run": "npx nodemon out/app.js",
+    "run": "pnpm exec nodemon out/app.js",
     "setup": "npm run build && npm run start"
   },
   "author": "Colorman",
