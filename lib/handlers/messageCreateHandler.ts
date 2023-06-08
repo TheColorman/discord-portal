@@ -25,7 +25,7 @@ async function handlePortal(
     ) {
         // Remove send permissions from user
         if (!message.member) return;
-        try { 
+        try {
             await message.channel.permissionOverwrites.create(message.member, {
                 SendMessages: false,
             });
@@ -36,15 +36,19 @@ async function handlePortal(
     }
 
     // Send message to other channels
-    const { content, embeds, files, attachments } = await helpers.preparePortalMessage(message);
+    const { content, embeds, files, attachments } =
+        await helpers.preparePortalMessage(message);
 
     // Send initial message
+    const username = message.author.username;
+    const discriminator = message.author.discriminator;
+    const tag = username + (discriminator === "0" ? "" : `#${discriminator}`);
     await helpers.propegatePortalMessage({
         portalId: portalConnection.portalId,
         message,
         options: {
             content,
-            username: `${message.author.tag} ${
+            username: `${tag} ${
                 message.guild?.name ? ` @ ${message.guild.name}` : ""
             }`,
             avatarURL:
@@ -57,7 +61,7 @@ async function handlePortal(
                 parse: ["users"],
             },
         },
-        attachments
+        attachments,
     });
 }
 
