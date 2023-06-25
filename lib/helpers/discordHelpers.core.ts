@@ -1127,7 +1127,11 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                     // Replace mention with username and discriminator
                     newOptions.content = newOptions.content!.replace(
                         `<@${mentionedUser.id}>`,
-                        `@${mentionedUser.username}#${mentionedUser.discriminator}`
+                        `@${mentionedUser.username}${
+                            mentionedUser.discriminator == "0"
+                                ? ""
+                                : "#" + mentionedUser.discriminator
+                        }`
                     );
                 }
             );
