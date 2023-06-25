@@ -190,6 +190,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 return message;
             } catch (err) {
                 // We don't have permission to delete the message
+                console.log(err);
                 return Error("No permission to delete message.");
             }
         }
