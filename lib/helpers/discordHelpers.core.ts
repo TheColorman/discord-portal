@@ -1140,6 +1140,27 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             return newOptions;
         })();
 
+        // Format channel mentions as normal text
+        newOptions = await (async () => {
+            if (!originalMessage.mentions.channels.size) return newOptions;
+
+            const promises = originalMessage.mentions.channels.map(
+                async (mentionedChannel) => {
+                    if (mentionedChannel.isDMBased()) {
+                        return;
+                    }
+                    // Replace mention with channel name
+                    newOptions.content = newOptions.content!.replace(
+                        `<#${mentionedChannel.id}>`,
+                        `#${mentionedChannel.name}`
+                    );
+                }
+            );
+
+            await Promise.all(promises);
+            return newOptions;
+        })();
+
         return options;
     }
 
