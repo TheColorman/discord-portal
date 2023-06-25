@@ -5,9 +5,6 @@ async function handlePortal(
     message: ValidMessage,
     helpers: DiscordHelpersCore
 ) {
-    // why do I have to check this type again?
-    if (!helpers.isValidChannel(message.channel)) return;
-
     const portalConnection = helpers.getPortalConnection(message.channel.id);
     if (!portalConnection) return;
 
