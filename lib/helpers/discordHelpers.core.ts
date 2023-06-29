@@ -804,7 +804,11 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 );
 
                 // Format reply
-                const authorTag = originalMessage?.author?.tag || "Unknown";
+                const authorName = originalMessage?.author?.username
+                    ? originalMessage.author.discriminator == "0"
+                        ? originalMessage.author.username
+                        : `${originalMessage.author.username}#${originalMessage.author.discriminator}`
+                    : "Unknown";
                 // Remove first line from message content if it contains reply text
                 const firstline = message.content.split("\n")[0];
                 if (
@@ -836,9 +840,9 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 referenceContent = referenceContent.replace(/\[/g, "［");
                 referenceContent = referenceContent.replace(/\]/g, "］");
                 // Limit reference content length
-                if (referenceContent.length > 50 - authorTag.length)
+                if (referenceContent.length > 50 - authorName.length)
                     referenceContent =
-                        referenceContent.substring(0, 50 - authorTag.length) +
+                        referenceContent.substring(0, 50 - authorName.length) +
                         "...";
                 const guildId = message.guildId;
                 const channelId = message.channelId;
@@ -849,7 +853,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 const sameChannel = originalMessage?.channelId === channelId;
                 const authorString = sameChannel
                     ? originalMessage?.author?.toString()
-                    : "`@" + authorTag + "`";
+                    : "`@" + authorName + "`";
                 const brackets = "⦗⦘";
 
                 return sameChannel
