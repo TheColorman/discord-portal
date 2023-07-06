@@ -3,6 +3,7 @@ import {
     ChannelType,
     Client,
     Collection,
+    DiscordAPIError,
     FetchMemberOptions,
     FetchMembersOptions,
     Guild,
@@ -171,7 +172,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
     public async deleteMessage(
         channel: ValidChannel,
         message: string | Message
-    ): Promise<Error | Message | null> {
+    ): Promise<Message | null> {
         // Fetch message
         if (typeof message === "string") {
             const fetchedMessage = await this.safeFetchMessage({
@@ -198,9 +199,15 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 await message.delete();
                 return message;
             } catch (err) {
-                // We don't have permission to delete the message
+                if (!(err instanceof DiscordAPIError)) {
+                    console.log(err);
+                    return null
+                }
+                if (err.code == 10008) { // Unknown Message
+                    return null
+                }
                 console.log(err);
-                return Error("No permission to delete message.");
+                throw err
             }
         }
     }

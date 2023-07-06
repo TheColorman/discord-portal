@@ -18,17 +18,18 @@ async function handleDeleteMessage(
         if (!channel) continue;
         const message = await helpers.safeFetchMessage({
             channel,
-            messageId: portalMessage.messageId
+            messageId: portalMessage.messageId,
         });
         if (!message) continue;
 
         // Attempt to delete message
-        const result = await helpers.deleteMessage(
-            channel,
-            portalMessage.messageId
-        );
-        // If result is an Error we couldn't delete the message
-        if (result instanceof Error) {
+        try {
+            await helpers.deleteMessage(
+                channel,
+                portalMessage.messageId
+            );
+        } catch (error) {
+            // If result is an Error we couldn't delete the message
             channel.send(
                 "Note: I need the `Manage Messages` permission to function properly."
             );
