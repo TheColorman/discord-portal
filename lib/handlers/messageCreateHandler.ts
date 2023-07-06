@@ -40,14 +40,18 @@ async function handlePortal(
     const username = message.author.username;
     const discriminator = message.author.discriminator;
     const tag = username + (discriminator === "0" ? "" : `#${discriminator}`);
+    let webhookName = `${tag}${
+        message.guild?.name ? ` @ ${message.guild.name}` : ""
+    }`;
+    if (webhookName.length > 80) {
+        webhookName = webhookName.slice(0, 77) + "...";
+    }
     await helpers.propegatePortalMessage({
         portalId: portalConnection.portalId,
         message,
         options: {
             content,
-            username: `${tag}${
-                message.guild?.name ? ` @ ${message.guild.name}` : ""
-            }`,
+            username: webhookName,
             avatarURL:
                 message.member?.avatarURL() ||
                 message.author.avatarURL() ||
