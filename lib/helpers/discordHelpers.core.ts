@@ -112,12 +112,21 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
      * @param messageId Id of the message to fetch
      * @returns A Discord Message if it was found, null otherwise
      */
-    public async safeFetchMessage(
-        channel: ValidChannel,
-        messageId: string
-    ): Promise<Message<true> | null> {
+    public async safeFetchMessage({
+        channel,
+        webhook,
+        messageId,
+    }: {
+        channel?: ValidChannel;
+        webhook?: Webhook;
+        messageId: string;
+    }): Promise<Message<boolean> | null> {
+        if (!channel && !webhook)
+            throw Error("At least one of channel or webhook must be defined.");
         try {
-            return await channel.messages.fetch(messageId);
+            if (channel) return await channel.messages.fetch(messageId);
+            if (webhook) return await webhook.fetchMessage(messageId);
+            return null;
         } catch (err) {
             return null;
         }
@@ -165,10 +174,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
     ): Promise<Error | Message | null> {
         // Fetch message
         if (typeof message === "string") {
-            const fetchedMessage = await this.safeFetchMessage(
+            const fetchedMessage = await this.safeFetchMessage({
                 channel,
-                message
-            );
+                messageId: message,
+            });
             if (!fetchedMessage) return null;
             message = fetchedMessage;
         }
@@ -472,10 +481,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                         pm.messageType !== "linkedAttachment"
                 );
                 if (!replyToPortalMessage) return undefined;
-                return this.safeFetchMessage(
+                return this.safeFetchMessage({
                     channel,
-                    replyToPortalMessage.messageId
-                );
+                    messageId: replyToPortalMessage.messageId,
+                });
             })();
 
             // Send message
@@ -785,10 +794,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 );
                 if (!channel) return undefined;
 
-                const message = await this.safeFetchMessage(
+                const message = await this.safeFetchMessage({
                     channel,
-                    portalMessage.messageId
-                );
+                    messageId: portalMessage.messageId,
+                });
                 if (!message) return undefined;
                 const originalPortalMessage = this.getPortalMessages(
                     portalMessage.id
@@ -798,10 +807,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                     originalPortalMessage.channelId
                 );
                 if (!originalMessageChannel) return undefined;
-                const originalMessage = await this.safeFetchMessage(
-                    originalMessageChannel,
-                    originalPortalMessage.messageId
-                );
+                const originalMessage = await this.safeFetchMessage({
+                    channel: originalMessageChannel,
+                    messageId: originalPortalMessage.messageId,
+                });
 
                 // Format reply
                 const authorName = originalMessage?.author?.username
@@ -920,10 +929,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             );
             if (!channel) return;
 
-            const message = await this.safeFetchMessage(
+            const message = await this.safeFetchMessage({
                 channel,
-                portalMessage.messageId
-            );
+                messageId: portalMessage.messageId,
+            });
             if (!message) return;
 
             const messageEditOptions =
@@ -961,7 +970,11 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             });
             if (!webhook) return;
 
-            const message = await webhook.fetchMessage(portalMessage.messageId);
+            const message = await this.safeFetchMessage({
+                webhook,
+                messageId: portalMessage.messageId,
+            })
+            if (!message) return;
 
             const localOptions = JSON.parse(
                 JSON.stringify(
@@ -1019,7 +1032,10 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             // Fetch message
             const channel = await this.safeFetchChannel(pm.channelId);
             if (!channel) return;
-            const message = await this.safeFetchMessage(channel, pm.messageId);
+            const message = await this.safeFetchMessage({
+                channel,
+                messageId: pm.messageId,
+            });
             if (!message) return;
 
             // Delete message
