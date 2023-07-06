@@ -38,14 +38,22 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
     }
 
     /**
+     * Generates a random strind ID.
+     * @returns Random string ID
+     */
+    public generateId(): string {
+        return Math.random().toString(36).slice(2, 13);
+    }
+
+    /**
      * Generates a unique portal ID.
      * @returns Unique portal ID
      */
     public generatePortalId(): PortalId {
-        let id = Math.floor(Math.random() * 1000000).toString();
-        const portals = this.getPortals();
-        while (portals[id as keyof typeof portals])
-            id = Math.floor(Math.random() * 1000000).toString();
+        let id = this.generateId();
+        while (this.getPortal(id)) {
+            id = this.generateId();
+        }
         return id;
     }
 
@@ -54,10 +62,10 @@ export default class DatabaseHelpersCore extends BaseHelpersCore {
      * @returns Unique portal message ID
      */
     public generatePortalMessageId(): PortalMessageId {
-        const id = Math.floor(Math.random() * 1000000).toString();
-        const portalMessages = this.getPortalMessages(id);
-        if (portalMessages[id as keyof typeof portalMessages])
-            return this.generatePortalMessageId();
+        let id = this.generateId();
+        while (this.getPortalMessages(id).size > 0) {
+            id = this.generateId();
+        }
         return id;
     }
 
