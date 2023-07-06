@@ -16,10 +16,10 @@ async function handleDeleteMessage(
         // Find channel and message objects
         const channel = await helpers.safeFetchChannel(portalMessage.channelId);
         if (!channel) continue;
-        const message = await helpers.safeFetchMessage(
+        const message = await helpers.safeFetchMessage({
             channel,
-            portalMessage.messageId
-        );
+            messageId: portalMessage.messageId
+        });
         if (!message) continue;
 
         // Attempt to delete message
