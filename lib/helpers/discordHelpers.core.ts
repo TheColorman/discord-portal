@@ -201,13 +201,14 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             } catch (err) {
                 if (!(err instanceof DiscordAPIError)) {
                     console.log(err);
-                    return null
+                    return null;
                 }
-                if (err.code == 10008) { // Unknown Message
-                    return null
+                if (err.code == 10008) {
+                    // Unknown Message
+                    return null;
                 }
                 console.log(err);
-                throw err
+                throw err;
             }
         }
     }
@@ -986,7 +987,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
             const message = await this.safeFetchMessage({
                 webhook,
                 messageId: portalMessage.messageId,
-            })
+            });
             if (!message) return;
 
             const localOptions = JSON.parse(
