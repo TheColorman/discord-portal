@@ -840,8 +840,8 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                 }
                 // Replace http with ḩttp if part of a link
                 message.content = message.content.replace(
-                    /(h)(ttps?:\/\/(?:\w+)+.*)/gm,
-                    "ḩ$2"
+                    /h(ttps?:\/\/)/gm,
+                    "ḩ$1"
                 );
 
                 let referenceContent =
