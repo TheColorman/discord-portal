@@ -837,6 +837,12 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                         .slice(1)
                         .join("\n");
                 }
+                // Replace http with ḩttp if part of a link
+                message.content = message.content.replace(
+                    /(.*)(h)(ttps?:\/\/(?:\w+)+.*)/gm,
+                    "$1ḩ$3"
+                );
+
                 let referenceContent =
                     // Check if message is attachment
                     message.content.length === 0
