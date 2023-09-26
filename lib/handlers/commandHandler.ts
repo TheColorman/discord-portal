@@ -483,6 +483,32 @@ async function handleCommands(
                         });
                         break;
                     }
+                    case "del": {
+                        const messageId = message.content.match(/(\d+)/)?.[1];
+                        if (!messageId) {
+                            message.reply({
+                                content: "Please provide a message id.",
+                            });
+                            break;
+                        }
+                        const portalMessageId = helpers.getPortalMessageId(messageId)
+                        if (!portalMessageId) {
+                            message.reply({
+                                content: "Message not found.",
+                            });
+                            break;
+                        }
+                        const portalMessages = helpers.getPortalMessages(portalMessageId);
+                        for (const [messageId, portalMessage] of portalMessages) {
+                            const message = await helpers.safeFetchMessage({ messageId: portalMessage.messageId });
+                            if (!message) continue;
+                            try {
+                                await message.delete();
+                            } catch (e) {
+                                // Ignore
+                            }
+                        }
+                    }
                 }
                 break;
             }
