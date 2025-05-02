@@ -1,16 +1,19 @@
 {
-	"name": "discord-portal",
-	"version": "0.3.1",
-	"main": "app.js",
-	"scripts": {
-		"start": "node out/app.js --no-warnings",
-		"build": "npx tsc",
-		"dev": "tsc -w",
-		"run": "pnpm exec nodemon out/app.js",
-		"setup": "npm run build && npm run start"
+  "name": "discord-portal",
+  "version": "0.3.1",
+  "main": "app.js",
+	"bin": {
+		"portal": "./out/app.js"
 	},
-	"author": "Colorman",
-	"license": "GPLv3",
+  "scripts": {
+    "start": "node out/app.js --no-warnings",
+    "build": "npx tsc",
+    "dev": "tsc -w",
+    "run": "npx nodemon out/app.js",
+    "setup": "npm run build && npm run start"
+  },
+  "author": "Colorman",
+  "license": "GPLv3",
 	"dependencies": {
 		"@types/better-sqlite3": "^7.6.4",
 		"@types/fluent-ffmpeg": "^2.1.21",
