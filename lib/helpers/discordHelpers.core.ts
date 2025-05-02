@@ -879,7 +879,7 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                     : "`@" + authorName + "`";
                 const brackets = "⦗⦘";
 
-                return sameChannel
+                return "-# " + (sameChannel
                     ? "[" +
                           brackets[0] +
                           "Reply to" +
@@ -904,8 +904,8 @@ export default class DiscordHelpersCore extends DatabaseHelpersCore {
                           brackets[1] +
                           "](<" +
                           url +
-                          ">)";
-            })()) || "`⦗Reply failed⦘`";
+                          ">)");
+            })()) || "-# `⦗Reply failed⦘`";
 
         return {
             ...options,
