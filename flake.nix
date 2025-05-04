@@ -16,5 +16,9 @@
         discord-portal = pkgs.callPackage ./nix/package.nix {};
         default = self.packages.${system}.discord-portal;
       };
+      modules = {
+        factbot = import ./nix/module.nix;
+        default = self.modules.${system}.factbot;
+      };
     });
 }
