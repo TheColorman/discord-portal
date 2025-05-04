@@ -44,6 +44,8 @@ Error.prepareStackTrace = (err, stack) => {
 const STATE_DIR = process.env.STATE_DIRECTORY || __dirname;
 const DBFILE = path.join(STATE_DIR, "db.sqlite");
 
+console.info(`Using state directory: ${STATE_DIR}`);
+
 const token = process.env.TOKEN_FILE
   ? (console.log(`Reading token from file: ${process.env.TOKEN_FILE}`),
     fs.readFileSync(process.env.TOKEN_FILE, { encoding: "utf8" })).trim()

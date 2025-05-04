@@ -85,9 +85,10 @@ export default class BaseHelpersCore {
       const command = `apng2gif ${pngPath} ${gifPath}`;
       exec(command, (err, stdout, stderr) => {
         if (err) {
+          console.error("apng2gif command failed");
           console.error(err);
           console.error(stderr);
-          resolve(null);
+          reject(null);
         } else {
           resolve(gifPath);
         }

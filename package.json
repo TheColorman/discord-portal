@@ -7,7 +7,7 @@
   },
   "scripts": {
     "start": "node out/app.js --no-warnings",
-    "build": "npx tsc",
+    "build": "tsc",
     "dev": "tsc -w",
     "run": "npx nodemon out/app.js",
     "setup": "npm run build && npm run start"
