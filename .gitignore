@@ -135,3 +135,8 @@ app.js
 
 # Other
 stickers/
+
+# nix
+.direnv
+result
+
