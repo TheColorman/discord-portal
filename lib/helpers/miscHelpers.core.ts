@@ -9,11 +9,17 @@ import {
 import * as fs from "fs";
 import fetch from "node-fetch";
 import { MAX_STICKERS_ON_DISK } from "../../config.json";
-import { emojiSuggestions, nameSuggestions, osType } from "../const";
+import { emojiSuggestions, nameSuggestions } from "../const";
 import { MessageEvent, Queue } from "../messageEventClasses";
 import { exec } from "child_process";
+import path from "path";
 
 export default class BaseHelpersCore {
+  stickerDir: string;
+  constructor(stateDirectory: string) {
+    this.stickerDir = path.join(stateDirectory, "stickers");
+  }
+
   /**
    * Send an ephemeral message to the user that the interaction has expired.
    * @param interaction Discord interaction
@@ -60,10 +66,12 @@ export default class BaseHelpersCore {
    * @returns Path to local .gif file or .png file if conversion fails
    */
   public async convertAPNGtoGIF(url: string, id: string) {
+    const pngPath = path.join(this.stickerDir, `${id}.png`);
+    const gifPath = path.join(this.stickerDir, `${id}.gif`);
     // Create file
     const response = await fetch(url);
     if (!response.body) return null;
-    const PNGstream = fs.createWriteStream(`./stickers/${id}.png`, {
+    const PNGstream = fs.createWriteStream(pngPath, {
       mode: 0o777,
     });
     response.body.pipe(PNGstream);
@@ -74,16 +82,14 @@ export default class BaseHelpersCore {
 
     // Convert to .gif using apng2gif
     const promise = new Promise<string | null>((resolve, reject) => {
-      const command = `/home/node/app/bin/apng2gif${
-        osType === "Windows" ? ".exe" : ""
-      } /home/node/app/stickers/${id}.png /home/node/app/stickers/${id}.gif`;
+      const command = `apng2gif ${pngPath} ${gifPath}`;
       exec(command, (err, stdout, stderr) => {
         if (err) {
           console.error(err);
           console.error(stderr);
           resolve(null);
         } else {
-          resolve(`./stickers/${id}.gif`);
+          resolve(gifPath);
         }
       });
     });
@@ -94,7 +100,7 @@ export default class BaseHelpersCore {
       return result;
     } catch (err) {
       console.error(err);
-      return `./stickers/${id}.png`;
+      return pngPath;
     }
   }
 
@@ -104,27 +110,27 @@ export default class BaseHelpersCore {
   public cleanStickerCache() {
     // Delete all PNG files.
     // Then, if there are more than 20 .gif files, delete the oldest ones
-    let stickerFiles = fs.readdirSync("./stickers/");
+    let stickerFiles = fs.readdirSync(this.stickerDir);
     for (const file of stickerFiles) {
       if (file.endsWith(".png")) {
         try {
-          fs.unlinkSync(`./stickers/${file}`);
+          fs.unlinkSync(path.join(this.stickerDir, file));
         } catch (err) {
           console.error(err);
         }
       }
     }
-    stickerFiles = fs.readdirSync("./stickers/");
+    stickerFiles = fs.readdirSync(this.stickerDir);
     if (stickerFiles.length > MAX_STICKERS_ON_DISK) {
       stickerFiles.sort((a, b) => {
         return (
-          fs.statSync(`./stickers/${a}`).mtime.getTime() -
-          fs.statSync(`./stickers/${b}`).mtime.getTime()
+          fs.statSync(path.join(this.stickerDir, a)).mtime.getTime() -
+          fs.statSync(path.join(this.stickerDir, b)).mtime.getTime()
         );
       });
       for (let i = 0; i < stickerFiles.length - MAX_STICKERS_ON_DISK; i++) {
         try {
-          fs.unlinkSync(`./stickers/${stickerFiles[i]}`);
+          fs.unlinkSync(path.join(this.stickerDir, stickerFiles[i]));
         } catch (err) {
           console.error(err);
         }
@@ -139,10 +145,10 @@ export default class BaseHelpersCore {
    */
   public async stickerToGIF(sticker: Sticker) {
     const stickerFile = fs
-      .readdirSync("./stickers/")
+      .readdirSync(this.stickerDir)
       .find((f) => f === `${sticker.id}.gif`);
     const stickerPath = stickerFile
-      ? `./stickers/${stickerFile}`
+      ? path.join(this.stickerDir, stickerFile)
       : await this.convertAPNGtoGIF(sticker.url, sticker.id);
 
     if (!stickerPath) return null;

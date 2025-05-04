@@ -13,6 +13,9 @@ import {
 } from "./lib/handlers";
 import fullSetup from "./lib/setup";
 import { MessageEvent, Queue } from "./lib/messageEventClasses";
+import fs from "fs";
+import path from "path";
+
 dotenv.config();
 
 Error.stackTraceLimit = Infinity; //! Remove in production
@@ -38,10 +41,17 @@ Error.prepareStackTrace = (err, stack) => {
   );
 };
 
-const token = process.env.TOKEN;
+const STATE_DIR = process.env.STATE_DIRECTORY || __dirname;
+const DBFILE = path.join(STATE_DIR, "db.sqlite");
+
+const token = process.env.TOKEN_FILE
+  ? (console.log(`Reading token from file: ${process.env.TOKEN_FILE}`),
+    fs.readFileSync(process.env.TOKEN_FILE, { encoding: "utf8" })).trim()
+  : (console.log("Reading token from environment variable"),
+    process.env.TOKEN?.trim());
 
 // Database
-const db = sqlite3("./db.sqlite");
+const db = sqlite3(DBFILE);
 process.on("exit", () => {
   db.close();
 });
@@ -51,7 +61,7 @@ process.on("uncaughtException", (err) => {
   console.error(err);
 });
 
-fullSetup(db);
+fullSetup(db, STATE_DIR);
 
 const client = new Client({
   intents: [
@@ -63,7 +73,7 @@ const client = new Client({
 });
 
 // Helpers
-const helpers = new DiscordHelpersCore(client, db);
+const helpers = new DiscordHelpersCore(STATE_DIR, client, db);
 
 // Keep track of setups
 const connectionSetups = new Map<
