@@ -83,7 +83,6 @@ in {
         RestrictSUIDSGID = true;
         LockPersonality = true;
         SystemCallFilter = [
-          "@system-service"
           "~@cpu-emulation"
           "~@debug"
           "~@keyring"

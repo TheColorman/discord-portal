@@ -18,29 +18,6 @@ import path from "path";
 
 dotenv.config();
 
-Error.stackTraceLimit = Infinity; //! Remove in production
-Error.prepareStackTrace = (err, stack) => {
-  // Only keep the trace that is part of this file
-  const trace = stack.filter((call) => call.getFileName() === __filename);
-  return (
-    err.name +
-    ": " +
-    err.message +
-    " at " +
-    trace
-      .map(
-        (call) =>
-          call.getFunctionName() +
-          " (" +
-          call.getFileName() +
-          ":" +
-          call.getLineNumber() +
-          ")",
-      )
-      .join(" -> ")
-  );
-};
-
 const STATE_DIR = process.env.STATE_DIRECTORY || __dirname;
 const DBFILE = path.join(STATE_DIR, "db.sqlite");
 
@@ -56,11 +33,6 @@ const token = process.env.TOKEN_FILE
 const db = sqlite3(DBFILE);
 process.on("exit", () => {
   db.close();
-});
-// Prevent crashes
-process.on("uncaughtException", (err) => {
-  console.log("Uncaught exception!");
-  console.error(err);
 });
 
 fullSetup(db, STATE_DIR);
