@@ -59,12 +59,13 @@ in {
       description = "Portal discord bot, ${instance.name} instance";
       wantedBy = ["multi-user.target"];
       after = ["network.target"];
-      environment.TOKEN_FILE = instance.tokenFile;
+      environment.TOKEN_FILE = "%d/token";
       serviceConfig = {
         Type = "simple";
         ExecStart = "${instance.package}/bin/discord-portal";
         Restart = "on-failure";
         StateDirectory = "discord-portal-${instance.name}";
+        LoadCredential = "token:${instance.tokenFile}";
 
         # Basic hardening
         NoNewPrivileges = true;
