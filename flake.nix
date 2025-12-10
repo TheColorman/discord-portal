@@ -2,23 +2,30 @@
   description = "Portal is a bot for connecting channels across Discord servers.";
   inputs = {
     nixpkgs.url = "nixpkgs";
-    flake-utils.url = "github:numtide/flake-utils";
+    flake-parts.url = "github:hercules-ci/flake-parts";
   };
-  outputs = {
-    self,
-    nixpkgs,
-    flake-utils,
-  }:
-    flake-utils.lib.eachDefaultSystem (system: let
-      pkgs = import nixpkgs {inherit system;};
-    in {
-      packages = {
-        discord-portal = pkgs.callPackage ./nix/package.nix {};
-        default = self.packages.${system}.discord-portal;
+  outputs = inputs:
+    inputs.flake-parts.lib.mkFlake {inherit inputs;} ({
+      self,
+      lib,
+      ...
+    }: {
+      systems = lib.systems.flakeExposed;
+
+      perSystem = {
+        config,
+        pkgs,
+        ...
+      }: {
+        packages = {
+          discord-portal = pkgs.callPackage ./nix/package.nix {};
+          default = config.packages.discord-portal;
+        };
       };
-      modules = {
+
+      flake.nixosModules = {
         factbot = import ./nix/module.nix;
-        default = self.modules.${system}.factbot;
+        default = self.nixosModules.factbot;
       };
     });
 }
