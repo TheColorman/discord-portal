@@ -1,7 +1,7 @@
 {
   description = "Portal is a bot for connecting channels across Discord servers.";
   inputs = {
-    nixpkgs.url = "nixpkgs";
+    nixpkgs.url = "github:NixOS/nixpkgs/release-25.11";
     flake-parts.url = "github:hercules-ci/flake-parts";
   };
   outputs = inputs:
