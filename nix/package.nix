@@ -16,11 +16,14 @@ buildNpmPackage {
 
   npmDepsHash = "sha256-PMuNXMx40JYOHovFIBU3JPqocg+LBQPWDnnRXL+o/80=";
 
-  nativeBuildInputs = [makeWrapper node-gyp];
+  nativeBuildInputs = [
+    makeWrapper
+    node-gyp
+  ];
 
   postInstall = ''
     wrapProgram $out/bin/discord-portal \
-    	--suffix PATH : ${lib.makeBinPath [apng2gif]}
+    	--suffix PATH : ${lib.makeBinPath [ apng2gif ]}
   '';
 
   meta = {
@@ -28,6 +31,6 @@ buildNpmPackage {
     homepage = "https://github.com/TheColorman/discord-portal";
     license = lib.licenses.gpl3;
     mainProgram = "discord-portal";
-    maintainers = with lib.maintainers; [TheColorman];
+    maintainers = with lib.maintainers; [ TheColorman ];
   };
 }
