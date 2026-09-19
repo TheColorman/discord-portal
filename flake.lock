@@ -2,7 +2,9 @@
   "nodes": {
     "flake-parts": {
       "inputs": {
-        "nixpkgs-lib": "nixpkgs-lib"
+        "nixpkgs-lib": [
+          "nixpkgs"
+        ]
       },
       "locked": {
         "lastModified": 1769996383,
@@ -20,32 +22,17 @@
     },
     "nixpkgs": {
       "locked": {
-        "lastModified": 1779566305,
-        "narHash": "sha256-7Uzr9zSwqgnVmI1c2x6ezTfnsBkqSJmKT6UCjNZHk9w=",
+        "lastModified": 1789842266,
+        "narHash": "sha256-7IwWs9NsRH2qh/xAvAWYt8ITrLfRFgTi64B4pgNGxAk=",
         "owner": "NixOS",
         "repo": "nixpkgs",
-        "rev": "33b08ea85addad5df1b409c4f918a08b925756f6",
+        "rev": "598c4fca687d0b8cd887f17b06975b1bdefaeaec",
         "type": "github"
       },
       "original": {
         "owner": "NixOS",
-        "ref": "release-25.11",
+        "ref": "release-26.05",
         "repo": "nixpkgs",
-        "type": "github"
-      }
-    },
-    "nixpkgs-lib": {
-      "locked": {
-        "lastModified": 1769909678,
-        "narHash": "sha256-cBEymOf4/o3FD5AZnzC3J9hLbiZ+QDT/KDuyHXVJOpM=",
-        "owner": "nix-community",
-        "repo": "nixpkgs.lib",
-        "rev": "72716169fe93074c333e8d0173151350670b824c",
-        "type": "github"
-      },
-      "original": {
-        "owner": "nix-community",
-        "repo": "nixpkgs.lib",
         "type": "github"
       }
     },

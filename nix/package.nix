@@ -2,7 +2,7 @@
   buildNpmPackage,
   makeWrapper,
   lib,
-  nodejs_20,
+  nodejs_26,
   node-gyp,
   apng2gif,
 }:
@@ -10,11 +10,11 @@ buildNpmPackage {
   pname = "discord-portal";
   version = "0.4.0";
 
-  nodejs = nodejs_20;
+  nodejs = nodejs_26;
 
   src = ./..;
 
-  npmDepsHash = "sha256-PMuNXMx40JYOHovFIBU3JPqocg+LBQPWDnnRXL+o/80=";
+  npmDepsHash = "sha256-IWz/Gn8CU8Y/VStqNS7vk0LuOiegTPLPgxpeIMgGMTA=";
 
   nativeBuildInputs = [
     makeWrapper
